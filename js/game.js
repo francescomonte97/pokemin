@@ -220,7 +220,7 @@ function showMinWelcomeModalIfNeeded() {
       },
       it: {
         title: 'Benvenuto nel MIN Project',
-        badge: 'NOVITA: Pokemon Gen 6-9',
+        badge: 'NOVITÀ: Pokemon Gen 6-9',
         subtitle: 'Una nuova evoluzione di Pokelike pensata per aggiornamenti piu costanti e contenuti piu ampi.',
         sections: [
           {
