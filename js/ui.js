@@ -4604,7 +4604,7 @@ function openPatchNotesModal() {
     <div style="background:#071017;border:2px solid #72d6ff;border-radius:12px;width:90%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;font-family:'Press Start 2P',monospace;box-shadow:0 0 0 2px #000,5px 5px 0 #000;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2f6f8f;background:#0d2635;">
         <span style="font-size:10px;color:#ffd84a;text-shadow:1px 1px 0 #000;">Patch Notes</span>
-        <button style="background:none;border:none;color:var(--text-main);font-size:16px;cursor:pointer;line-height:1;" onclick="document.getElementById('patch-notes-modal').remove()">✕</button>
+        <button style="background:#ffd84a;border:2px solid #fff;color:#181410;font-size:14px;cursor:pointer;line-height:1;padding:4px 7px;border-radius:4px;box-shadow:2px 2px 0 #000;text-shadow:none;" onclick="document.getElementById('patch-notes-modal').remove()">✕</button>
       </div>
       <div style="overflow-y:auto;padding:16px;">${notesHtml}</div>
     </div>`;
