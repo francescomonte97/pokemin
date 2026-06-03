@@ -7,6 +7,54 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .telegram-link,
+    .telegram-link:visited {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 10px auto 0;
+      padding: 8px 12px;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      border-radius: 9px;
+      background: linear-gradient(180deg, #2fb6f2 0%, #168ac4 100%);
+      color: #ffffff;
+      font-size: 9px;
+      line-height: 1;
+      text-decoration: none;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 4px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .telegram-link:hover,
+    .telegram-link:focus-visible {
+      background: linear-gradient(180deg, #36c2ff 0%, #1d9add 100%);
+      color: #ffffff;
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    .telegram-link:active {
+      background: linear-gradient(180deg, #168ac4 0%, #0f6fa2 100%);
+      color: #ffffff;
+      transform: translateY(2px);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .telegram-icon-box {
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 20px;
+    }
+
+    .telegram-icon-box svg {
+      display: block;
+    }
+  </style>
 </head>
 <body>
 
@@ -17,7 +65,11 @@
 <div id="title-screen" class="screen active">
   <div class="game-logo">POKEMIN</div>
   <div class="game-subtitle">Pokémon Roguelike</div>
-  <div style="color:var(--text-dim);font-size:9px;margin-bottom:6px;cursor:pointer;" onclick="openPatchNotesModal()">v1.6 — patch notes</div>
+  <div style="color:var(--text-dim);font-size:9px;margin-bottom:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;" onclick="openPatchNotesModal()">
+    <span style="color:#322f32;text-shadow:0 1px 0 #242120,0 0 4px rgba(67, 70, 65, 0.85);">v1.7</span>
+    <span style="font-size:7px;color:#ffffff;background:#4d96f6;border:1px solid #ffffff;padding:3px 5px;border-radius:4px;text-shadow:0 1px 0 #000;box-shadow:0 0 0 1px rgba(0,0,0,0.65);">MIN</span>
+    <span>— patch notes</span>
+  </div>
   <button id="btn-continue-run" class="btn-primary" style="margin-bottom: 10px;">Continue Run</button>
   <button id="btn-continue-endless" class="btn-primary" style="display:none;margin-bottom:10px;">Continue Battle Tower</button>
   <div class="gen-toggle-wrap">
@@ -44,9 +96,9 @@
     <button id="btn-cloud-sync" class="btn-secondary">☁ &lt;img onerror=...&gt;</button>
     <div id="cloud-sync-info" style="font-size: 8px; display: block;" class="">cloud save active</div>
   </div>
-  <a href="https://discord.gg/YsakfWStYq" target="_blank" rel="noopener" class="discord-link">
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"></path></svg>
-    Join Discord
+  <a href="https://t.me/pokemin1" target="_blank" rel="noopener" class="telegram-link">
+    <span class="telegram-icon-box" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path fill="#ffffff" d="M21.944 4.667c.289-1.205-.781-2.219-1.944-1.753L2.56 9.894c-1.18.472-1.163 2.136.026 2.584l4.443 1.674 1.712 5.36c.36 1.129 1.765 1.437 2.55.56l2.48-2.772 4.847 3.565c.99.728 2.402.184 2.681-1.034l2.645-15.164ZM8.05 13.24l10.795-6.692c.502-.311 1.018.368.586.77l-8.91 8.295-.345 3.069-1.345-4.211-.78-1.231Zm2.945 4.832.22-1.96 1.438 1.057-1.658.903Z"></path></svg></span>
+    Join Telegram
   </a>
   <div style="margin-top:6px;">
     <a href="privacy.html" style="color:var(--text-dim);font-size:8px;text-decoration:none;">Privacy Policy</a>
@@ -247,9 +299,9 @@
   <div id="gameover-badges"></div>
   <div id="gameover-team"></div>
   <button id="btn-retry" class="btn-primary">Try Again</button>
-  <a href="https://discord.gg/YsakfWStYq" target="_blank" rel="noopener" class="discord-link">
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"></path></svg>
-    Join Discord
+  <a href="https://t.me/pokemin1" target="_blank" rel="noopener" class="telegram-link">
+    <span class="telegram-icon-box" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path fill="#ffffff" d="M21.944 4.667c.289-1.205-.781-2.219-1.944-1.753L2.56 9.894c-1.18.472-1.163 2.136.026 2.584l4.443 1.674 1.712 5.36c.36 1.129 1.765 1.437 2.55.56l2.48-2.772 4.847 3.565c.99.728 2.402.184 2.681-1.034l2.645-15.164ZM8.05 13.24l10.795-6.692c.502-.311 1.018.368.586.77l-8.91 8.295-.345 3.069-1.345-4.211-.78-1.231Zm2.945 4.832.22-1.96 1.438 1.057-1.658.903Z"></path></svg></span>
+    Join Telegram
   </a>
 </div>
 
@@ -267,9 +319,9 @@
   <div style="display:flex;gap:8px;justify-content:center;margin-top:6px;">
     <button onclick="openHallOfFameModal()" class="btn-secondary">🏛️ Hall of Fame</button>
   </div>
-  <a href="https://discord.gg/YsakfWStYq" target="_blank" rel="noopener" class="discord-link">
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"></path></svg>
-    Join Discord
+  <a href="https://t.me/pokemin1" target="_blank" rel="noopener" class="telegram-link">
+    <span class="telegram-icon-box" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path fill="#ffffff" d="M21.944 4.667c.289-1.205-.781-2.219-1.944-1.753L2.56 9.894c-1.18.472-1.163 2.136.026 2.584l4.443 1.674 1.712 5.36c.36 1.129 1.765 1.437 2.55.56l2.48-2.772 4.847 3.565c.99.728 2.402.184 2.681-1.034l2.645-15.164ZM8.05 13.24l10.795-6.692c.502-.311 1.018.368.586.77l-8.91 8.295-.345 3.069-1.345-4.211-.78-1.231Zm2.945 4.832.22-1.96 1.438 1.057-1.658.903Z"></path></svg></span>
+    Join Telegram
   </a>
 </div>
 

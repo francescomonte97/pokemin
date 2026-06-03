@@ -3934,6 +3934,55 @@ function openDexDetailModal(speciesId, name, spriteUrl, shinySpriteUrl, types) {
 
 const PATCH_NOTES = [
   {
+    version: 'MIN',
+    title: 'MIN Project Roadmap',
+    date: '2026-06-03',
+    min: true,
+    project: true,
+    sections: [
+      {
+        heading: 'Project Direction',
+        entries: [
+          'The MIN project aims to improve this game with constant updates focused on UI polish, gameplay depth, and accessibility',
+          'Upcoming updates will continue refining the player experience while keeping the game fast, readable, and easy to play across devices',
+          'A leaderboard mode is planned to arrive soon, giving players a new way to compare runs, teams, and achievements',
+        ],
+      },
+    ],
+  },
+  {
+    version: '1.8',
+    title: 'Hoenn Expansion Preview',
+    date: 'Coming Soon',
+    min: true,
+    sections: [
+      {
+        heading: 'Coming Next',
+        entries: [
+          'Hoenn will be released for both Normal Mode and Nuzlocke Mode',
+          'New Hoenn maps will be added, expanding the run with fresh routes and region-specific progression',
+          'New trainers will be introduced to make the Hoenn experience feel distinct from the existing regions',
+        ],
+      },
+    ],
+  },
+  {
+    version: '1.7',
+    title: 'Extended Pokédex, Regions & Achievements',
+    date: '2026-06-03',
+    min: true,
+    sections: [
+      {
+        heading: 'New Content',
+        entries: [
+          'Added all 1025 Pokémon to the game, greatly expanding the available Pokédex content',
+          'Added new regions to the Hall of Fame so completed runs can better reflect regional progress',
+          'Added new achievements to give players more goals across expanded content and modes',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.6',
     title: 'Achievements, Sync & Tower Patch',
     date: '2026-05-20',
@@ -4510,20 +4559,39 @@ function openPatchNotesModal() {
   const existing = document.getElementById('patch-notes-modal');
   if (existing) { existing.remove(); return; }
 
-  const notesHtml = PATCH_NOTES.map(patch => {
+  const notesHtml = PATCH_NOTES.map((patch, index) => {
     const sectionsHtml = patch.sections.map(s => `
       <div style="margin-bottom:12px;">
-        <div style="font-size:9px;color:#4af;margin-bottom:6px;">${s.heading}</div>
+        <div style="font-size:9px;color:#7fd3ff;margin-bottom:6px;text-shadow:1px 1px 0 #000;">${s.heading}</div>
         <ul style="margin:0;padding-left:16px;list-style:disc;">
-          ${s.entries.map(e => `<li style="font-size:9px;color:var(--text-dim);margin-bottom:4px;line-height:1.6;">${e}</li>`).join('')}
+          ${s.entries.map(e => `<li style="font-size:9px;color:#f2f2ea;margin-bottom:5px;line-height:1.7;text-shadow:1px 1px 0 #000;">${e}</li>`).join('')}
         </ul>
       </div>`).join('');
+    const legacyDivider = index > 0 && PATCH_NOTES[index - 1].min && !patch.min
+      ? `<div style="margin:24px 0 18px;padding:10px 12px;border:2px solid var(--border);background:rgba(0,0,0,0.22);text-align:center;color:var(--text-dim);font-size:8px;line-height:1.6;">Legacy Patch Notes</div>`
+      : '';
+    const minBadge = patch.min
+      ? `<span style="font-size:7px;color:#181410;background:#2fb6f2;border:1px solid #fff;padding:3px 5px;border-radius:4px;">MIN</span>`
+      : '';
+    if (patch.project) {
+      return `
+        <div style="margin-bottom:22px;border:2px solid #72d6ff;border-radius:10px;padding:14px;background:linear-gradient(180deg,rgba(22,82,112,0.78),rgba(8,22,32,0.92));box-shadow:0 0 0 1px rgba(255,255,255,0.16) inset,4px 4px 0 #000;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;border-bottom:1px solid rgba(47,182,242,0.45);padding-bottom:8px;">
+            <span style="font-size:7px;color:#181410;background:#2fb6f2;border:1px solid #fff;padding:4px 6px;border-radius:4px;">MIN</span>
+            <span style="font-size:11px;color:#b9efff;line-height:1.5;text-shadow:1px 1px 0 #000;">${patch.title}</span>
+            <span style="font-size:8px;color:#d8f6ff;margin-left:auto;text-shadow:1px 1px 0 #000;">${patch.date}</span>
+          </div>
+          ${sectionsHtml}
+        </div>`;
+    }
     return `
-      <div style="margin-bottom:20px;">
+      ${legacyDivider}
+      <div style="margin-bottom:20px;${patch.min ? 'border:2px solid #72d6ff;border-radius:10px;padding:12px;background:rgba(8,22,32,0.88);box-shadow:3px 3px 0 #000;' : 'background:rgba(0,0,0,0.22);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px;'}">
         <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:8px;">
-          <span style="font-size:12px;color:gold;">v${patch.version}</span>
-          <span style="font-size:10px;color:#fff;">${patch.title}</span>
-          <span style="font-size:9px;color:var(--text-dim);margin-left:auto;">${patch.date}</span>
+          <span style="font-size:12px;color:${patch.min ? '#7fd3ff' : '#ffd84a'};text-shadow:1px 1px 0 #000;">v${patch.version}</span>
+          ${minBadge}
+          <span style="font-size:10px;color:#fff;text-shadow:1px 1px 0 #000;">${patch.title}</span>
+          <span style="font-size:9px;color:#d8d8d0;margin-left:auto;text-shadow:1px 1px 0 #000;">${patch.date}</span>
         </div>
         ${sectionsHtml}
       </div>`;
@@ -4533,9 +4601,9 @@ function openPatchNotesModal() {
   modal.id = 'patch-notes-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;';
   modal.innerHTML = `
-    <div style="background:var(--bg-main);border:2px solid var(--border);border-radius:12px;width:90%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;font-family:'Press Start 2P',monospace;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
-        <span style="font-size:10px;color:gold;">Patch Notes</span>
+    <div style="background:#071017;border:2px solid #72d6ff;border-radius:12px;width:90%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;font-family:'Press Start 2P',monospace;box-shadow:0 0 0 2px #000,5px 5px 0 #000;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2f6f8f;background:#0d2635;">
+        <span style="font-size:10px;color:#ffd84a;text-shadow:1px 1px 0 #000;">Patch Notes</span>
         <button style="background:none;border:none;color:var(--text-main);font-size:16px;cursor:pointer;line-height:1;" onclick="document.getElementById('patch-notes-modal').remove()">✕</button>
       </div>
       <div style="overflow-y:auto;padding:16px;">${notesHtml}</div>

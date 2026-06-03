@@ -100,6 +100,7 @@ async function initGame() {
   // that overwrites another device's progress with the un-merged local save.
   // initCloudSave handles the post-merge push itself.
   if (typeof initCloudSave === 'function') await initCloudSave();
+  await showMinWelcomeModalIfNeeded();
   // Generation toggle — selection is read when Normal/Nuzlocke is clicked
   // and persists across reloads via localStorage.
   let selectedGen = [1, 2, 3].includes(Number(localStorage.getItem('poke_selected_gen')))
@@ -117,8 +118,8 @@ async function initGame() {
       syncGenButtons();
     };
   });
-  document.getElementById('btn-new-run').onclick  = () => selectedGen === 3 ? showGen3ComingSoonModal() : startNewRun(false, selectedGen === 2);
-  document.getElementById('btn-hard-run').onclick = () => selectedGen === 3 ? showGen3ComingSoonModal() : startNewRun(true,  selectedGen === 2);
+  document.getElementById('btn-new-run').onclick  = () => selectedGen === 3 ? showGen3ComingSoonModal('Normal Mode') : startNewRun(false, selectedGen === 2);
+  document.getElementById('btn-hard-run').onclick = () => selectedGen === 3 ? showGen3ComingSoonModal('Nuzlocke Mode') : startNewRun(true,  selectedGen === 2);
 
   const endlessBtn = document.getElementById('btn-endless-run');
   if (endlessBtn) {
@@ -188,7 +189,123 @@ async function initGame() {
   }
 }
 
-function showGen3ComingSoonModal() {
+function showMinWelcomeModalIfNeeded() {
+  const key = 'min_project_welcome_seen';
+  if (localStorage.getItem(key) === '1') return Promise.resolve();
+
+  return new Promise(resolve => {
+    document.getElementById('min-welcome-modal')?.remove();
+
+    const copy = {
+      en: {
+        title: 'Welcome to MIN Project',
+        badge: 'NEW: Gen 6-9 Pokemon',
+        subtitle: 'A new branch of Pokelike focused on faster updates and broader content.',
+        sections: [
+          {
+            heading: 'What is MIN Project?',
+            body: 'MIN Project extends the features introduced by legacy Pokelike with more frequent updates, more regions, more Pokemon, and a stronger focus on player feedback.',
+          },
+          {
+            heading: 'What changes from legacy Pokelike?',
+            body: 'You will see expanded Pokedex support, new Battle Tower regions, Pokemon from Gen 6, Gen 7, Gen 8, and Gen 9, plus upcoming improvements like Hoenn Normal Mode, new maps, new trainers, and leaderboard-focused features.',
+          },
+          {
+            heading: 'Your save is preserved',
+            body: 'You can access your existing save with the same login you used on Pokelike. Your progress, cloud save, achievements, Pokedex, and Hall of Fame data remain available.',
+          },
+        ],
+        check: 'I understand what MIN Project is and I want to continue.',
+        button: 'Continue',
+      },
+      it: {
+        title: 'Benvenuto nel MIN Project',
+        badge: 'NOVITA: Pokemon Gen 6-9',
+        subtitle: 'Una nuova evoluzione di Pokelike pensata per aggiornamenti piu costanti e contenuti piu ampi.',
+        sections: [
+          {
+            heading: 'Cos\'e il MIN Project?',
+            body: 'MIN Project estende le funzionalita introdotte dal Pokelike legacy con aggiornamenti piu frequenti, piu regioni, piu Pokemon e maggiore attenzione al parere degli utenti.',
+          },
+          {
+            heading: 'Cosa cambia rispetto al Pokelike legacy?',
+            body: 'Troverai un Pokedex ampliato, nuove regioni nella Battle Tower, Pokemon di Gen 6, Gen 7, Gen 8 e Gen 9, piu le prossime aggiunte come Hoenn in Normal Mode, nuove mappe, nuovi trainer e funzionalita legate alle leaderboard.',
+          },
+          {
+            heading: 'Il tuo salvataggio resta disponibile',
+            body: 'Puoi accedere al tuo salvataggio usando lo stesso login che usavi su Pokelike. Progressi, cloud save, achievement, Pokedex e Hall of Fame restano disponibili.',
+          },
+        ],
+        check: 'Ho compreso cos\'e il MIN Project e voglio continuare.',
+        button: 'Continua',
+      },
+    };
+
+    let lang = 'it';
+    const modal = document.createElement('div');
+    modal.id = 'min-welcome-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    const render = () => {
+      const t = copy[lang];
+      modal.innerHTML = `
+        <div style="background:#071017;border:2px solid #72d6ff;border-radius:12px;width:94%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;font-family:'Press Start 2P',monospace;box-shadow:0 0 0 2px #000,5px 5px 0 #000;">
+          <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #2f6f8f;background:#0d2635;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;line-height:1.5;color:#ffd84a;text-shadow:1px 1px 0 #000;">${t.title}</div>
+              <div style="font-size:7px;line-height:1.6;color:#d8f6ff;margin-top:4px;">${t.subtitle}</div>
+            </div>
+            <span style="font-size:7px;color:#181410;background:#2fb6f2;border:1px solid #fff;padding:4px 6px;border-radius:4px;white-space:nowrap;">MIN</span>
+          </div>
+          <div style="overflow-y:auto;padding:16px;">
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
+              <button class="btn-secondary min-welcome-lang" data-lang="it" style="font-family:'Press Start 2P',monospace;font-size:7px;flex:1;border-color:${lang === 'it' ? '#72d6ff' : 'var(--border)'};color:${lang === 'it' ? '#72d6ff' : 'var(--text-dim)'};">Italiano</button>
+              <button class="btn-secondary min-welcome-lang" data-lang="en" style="font-family:'Press Start 2P',monospace;font-size:7px;flex:1;border-color:${lang === 'en' ? '#72d6ff' : 'var(--border)'};color:${lang === 'en' ? '#72d6ff' : 'var(--text-dim)'};">English</button>
+            </div>
+            <div style="border:2px solid #72d6ff;background:linear-gradient(180deg,rgba(22,82,112,0.78),rgba(8,22,32,0.92));border-radius:10px;padding:12px;margin-bottom:14px;box-shadow:0 0 0 1px rgba(255,255,255,0.14) inset;">
+              <div style="font-size:10px;line-height:1.7;color:#b9efff;text-align:center;text-shadow:1px 1px 0 #000;">${t.badge}</div>
+            </div>
+            ${t.sections.map(s => `
+              <div style="margin-bottom:13px;">
+                <div style="font-size:8px;line-height:1.7;color:#7fd3ff;margin-bottom:5px;text-shadow:1px 1px 0 #000;">${s.heading}</div>
+                <div style="font-size:8px;line-height:1.8;color:#f2f2ea;text-shadow:1px 1px 0 #000;">${s.body}</div>
+              </div>
+            `).join('')}
+            <label style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:10px;border:1px solid #2f6f8f;background:rgba(0,0,0,0.28);cursor:pointer;">
+              <input id="min-welcome-check" type="checkbox" style="width:16px;height:16px;flex:0 0 auto;margin-top:1px;">
+              <span style="font-size:8px;line-height:1.7;color:#f2f2ea;">${t.check}</span>
+            </label>
+            <button id="min-welcome-continue" class="btn-primary" disabled style="width:100%;margin-top:14px;opacity:0.45;">${t.button}</button>
+          </div>
+        </div>
+      `;
+
+      modal.querySelectorAll('.min-welcome-lang').forEach(btn => {
+        btn.addEventListener('click', () => {
+          lang = btn.dataset.lang || 'it';
+          render();
+        });
+      });
+      const checkbox = modal.querySelector('#min-welcome-check');
+      const continueBtn = modal.querySelector('#min-welcome-continue');
+      checkbox?.addEventListener('change', () => {
+        continueBtn.disabled = !checkbox.checked;
+        continueBtn.style.opacity = checkbox.checked ? '' : '0.45';
+      });
+      continueBtn?.addEventListener('click', () => {
+        if (!checkbox?.checked) return;
+        localStorage.setItem(key, '1');
+        modal.remove();
+        resolve();
+      });
+    };
+
+    render();
+    document.body.appendChild(modal);
+  });
+}
+
+function showGen3ComingSoonModal(modeLabel = 'Normal Mode') {
   document.getElementById('gen3-coming-soon-modal')?.remove();
   const target = new Date(2026, 5, 7, 0, 0, 0);
   const modal = document.createElement('div');
@@ -202,7 +319,7 @@ function showGen3ComingSoonModal() {
       </div>
       <div style="padding:18px 14px;text-align:center;font-family:'Press Start 2P',monospace;">
         <div style="font-size:14px;line-height:1.6;color:var(--gold);margin-bottom:12px;">COMING SOON</div>
-        <div style="font-size:8px;line-height:1.7;color:var(--text-dim);margin-bottom:14px;">Gen III Normal Mode</div>
+        <div style="font-size:8px;line-height:1.7;color:var(--text-dim);margin-bottom:14px;">Gen III ${modeLabel}</div>
         <div id="gen3-countdown" style="font-size:10px;line-height:1.8;color:var(--text-main);background:rgba(0,0,0,0.28);border:2px solid var(--border);padding:10px 8px;"></div>
         <button class="btn-primary" id="gen3-coming-soon-ok" style="margin-top:14px;width:100%;">OK</button>
       </div>
@@ -2847,7 +2964,7 @@ function cleanupTransientUI() {
   const MODAL_IDS = [
     'settings-modal', 'achievements-modal', 'pokedex-modal', 'dex-detail-modal',
     'patch-notes-modal', 'hof-modal', 'item-equip-modal', 'tutorial-overlay',
-    'swap-trait-overlay',
+    'swap-trait-overlay', 'min-welcome-modal',
   ];
   for (const id of MODAL_IDS) document.getElementById(id)?.remove();
   // Persistent overlays declared in index.html — hide rather than remove.
