@@ -51,6 +51,49 @@ const PRIMITIVE_KEYS = new Set([
 function _getSaveUuid() { return localStorage.getItem('poke_save_uuid'); }
 function _getServerUsername()  { return localStorage.getItem('poke_username'); }
 function _getDisplayUsername() { return localStorage.getItem('poke_username_1') || _getServerUsername(); }
+function _escapeCloudText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+function _queuePlayerStats(reason = 'sync', options = {}) {
+  if (!_getSaveUuid() || typeof window.queuePlayerStatsToFirestore !== 'function') return;
+  window.queuePlayerStatsToFirestore(reason, options);
+}
+
+function isPlayerLoggedIn() {
+  return !!(_getSaveUuid() && _getServerUsername());
+}
+
+function requireLoginToPlay() {
+  if (isPlayerLoggedIn()) return true;
+  _showAuthModal({ required: true });
+  return false;
+}
+
+function applyLoginGateUI() {
+  const locked = !isPlayerLoggedIn();
+  const gatedSelectors = [
+    '#btn-new-run',
+    '#btn-hard-run',
+    '#btn-endless-run',
+    '#btn-continue-run',
+    '#btn-continue-endless',
+    'button[onclick="openPokedexModal()"]',
+    'button[onclick="openAchievementsModal()"]',
+    'button[onclick="openHallOfFameModal()"]',
+    'button[onclick="openSettingsModal()"]',
+  ];
+  document.querySelectorAll(gatedSelectors.join(',')).forEach(btn => {
+    if (!btn.dataset.originalTitle) btn.dataset.originalTitle = btn.title || '';
+    btn.classList.toggle('login-gated', locked);
+    btn.title = locked ? 'Log in or register to use this feature' : btn.dataset.originalTitle;
+  });
+}
 
 function _getMeta() {
   try { return JSON.parse(localStorage.getItem('poke_meta') || '{}'); }
@@ -309,6 +352,7 @@ async function _pushLocal() {
     if (res.ok) {
       localStorage.setItem('poke_last_cloud_sync', String(save.lastSaved));
       _setCloudStatus('online');
+      _queuePlayerStats('cloud_push');
     } else {
       _setCloudStatus('offline');
     }
@@ -432,16 +476,19 @@ function _updateSyncUI() {
     btn.onclick = _showAuthModal;
     if (info) info.style.display = 'none';
   }
+  applyLoginGateUI();
 }
 
-function _showAuthModal() {
+function _showAuthModal(options = {}) {
   document.getElementById('save-auth-modal')?.remove();
+  const required = !!options.required;
   const modal = document.createElement('div');
   modal.id = 'save-auth-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999;';
   modal.innerHTML = `
     <div style="background:var(--bg2);border:2px solid var(--border);padding:24px;max-width:360px;width:90%;font-family:monospace;display:flex;flex-direction:column;gap:10px;">
       <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);">☁ CLOUD SAVE</div>
+      ${required ? '<div style="font-size:10px;color:#ffd84a;line-height:1.5;">Log in or register to play and access your saved progress.</div>' : ''}
       <input id="auth-username" placeholder="Username" autocomplete="username"
         style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px;font-size:12px;font-family:monospace;">
       <input id="auth-password" type="password" placeholder="Password" autocomplete="current-password"
@@ -477,8 +524,10 @@ function _showAuthModal() {
       localStorage.setItem('poke_save_uuid', data.uuid);
       localStorage.setItem('poke_username', data.username);
       localStorage.setItem('poke_username_1', data.username);
+      _queuePlayerStats('auth', { force: true });
       modal.remove();
       _updateSyncUI();
+      applyLoginGateUI();
       await _loadFromServer();
       if (typeof initGame === 'function') initGame();
     } catch (e) {
@@ -498,7 +547,7 @@ function _showAuthModal() {
 
 function _showAccountModal() {
   document.getElementById('save-auth-modal')?.remove();
-  const username = _getDisplayUsername();
+  const username = _escapeCloudText(_getDisplayUsername());
   const modal = document.createElement('div');
   modal.id = 'save-auth-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999;';
@@ -525,6 +574,7 @@ function _showAccountModal() {
     localStorage.removeItem('poke_last_cloud_sync');
     modal.remove();
     _updateSyncUI();
+    applyLoginGateUI();
   };
   document.getElementById('account-close-btn').onclick = () => modal.remove();
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
@@ -532,7 +582,10 @@ function _showAccountModal() {
 
 async function initCloudSave() {
   _updateSyncUI();
-  if (_getSaveUuid()) await _loadFromServer();
+  if (_getSaveUuid()) {
+    _queuePlayerStats('init');
+    await _loadFromServer();
+  }
 
   // Re-pull when the tab regains focus so a second device's progress shows
   // up without forcing the player to reload. This is safe to do mid-run:

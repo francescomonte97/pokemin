@@ -3347,6 +3347,7 @@ function applyDarkMode() {
 }
 
 function openSettingsModal() {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   const existing = document.getElementById('settings-modal');
   if (existing) { existing.remove(); return; }
 
@@ -3396,6 +3397,7 @@ function openSettingsModal() {
 // ---- Achievements Modal ----
 
 function openAchievementsModal() {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   const existing = document.getElementById('achievements-modal');
   if (existing) { existing.remove(); return; }
 
@@ -3444,6 +3446,7 @@ function openAchievementsModal() {
 // ---- Pokedex Modal ----
 
 async function openPokedexModal(initialTab = 'normal') {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   const existing = document.getElementById('pokedex-modal');
   if (existing) { existing.remove(); return; }
 
@@ -4604,7 +4607,7 @@ function openPatchNotesModal() {
     <div style="background:#071017;border:2px solid #72d6ff;border-radius:12px;width:90%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;font-family:'Press Start 2P',monospace;box-shadow:0 0 0 2px #000,5px 5px 0 #000;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2f6f8f;background:#0d2635;">
         <span style="font-size:10px;color:#ffd84a;text-shadow:1px 1px 0 #000;">Patch Notes</span>
-        <button style="background:#ffd84a;border:2px solid #fff;color:#181410;font-size:14px;cursor:pointer;line-height:1;padding:4px 7px;border-radius:4px;box-shadow:2px 2px 0 #000;text-shadow:none;" onclick="document.getElementById('patch-notes-modal').remove()">✕</button>
+        <button class="ach-modal-close" onclick="document.getElementById('patch-notes-modal').remove()">✕</button>
       </div>
       <div style="overflow-y:auto;padding:16px;">${notesHtml}</div>
     </div>`;
@@ -4615,6 +4618,7 @@ function openPatchNotesModal() {
 // ---- Hall of Fame Modal ----
 
 async function openHallOfFameModal() {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   const existing = document.getElementById('hof-modal');
   if (existing) { existing.remove(); return; }
 
@@ -4625,13 +4629,49 @@ async function openHallOfFameModal() {
     try { await loadStaticPokedex(); } catch {}
   }
 
-  const entries = getHallOfFame();
+  const rawEntries = getHallOfFame();
+  const entries = Array.isArray(rawEntries) ? rawEntries : [];
 
   const modal = document.createElement('div');
   modal.id = 'hof-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;';
 
+  function escapeHofText(value) {
+    const text = String(value ?? '');
+    if (text.length > 10) return '';
+    return text.replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
+  function hofNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.trunc(n) : fallback;
+  }
+
+  function hofSpriteUrl(speciesId, isShiny) {
+    const id = hofNumber(speciesId, 0);
+    if (id < 1 || id > 1025) return 'sprites/questionMark.png';
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${isShiny ? 'shiny/' : ''}${id}.png`;
+  }
+
+  function hofItemIconHtml(item) {
+    if (!item || typeof item !== 'object') return '';
+    const id = typeof item.id === 'string' ? item.id : '';
+    if (!/^[a-z0-9_-]{1,10}$/i.test(id)) return '';
+    const slug = id.replace(/_/g, '-');
+    const name = escapeHofText(item.name || id.replace(/[_-]/g, ' '));
+    if (!name) return '';
+    const url = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`;
+    return `<img src="${url}" alt="${name}" title="${name}" class="item-sprite-icon" style="width:12px;height:12px;image-rendering:pixelated;vertical-align:middle;">`;
+  }
+
   function entryMatchesFilter(e, filter) {
+    if (!e || typeof e !== 'object') return false;
     if (filter === 'all')      return true;
     if (filter === 'normal')   return !e.endless && !e.hardMode && !e.gen2Mode;
     if (filter === 'nuzlocke') return !e.endless && !!e.hardMode;
@@ -4651,30 +4691,40 @@ async function openHallOfFameModal() {
       })();
 
   function renderEntryHtml(e) {
-    const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
-    const pokemonHtml = e.team.map(p => {
+    e = e && typeof e === 'object' ? e : {};
+    const team = Array.isArray(e.team) ? e.team : [];
+    const pokemonHtml = team.map(rawPokemon => {
+      const p = rawPokemon && typeof rawPokemon === 'object' ? rawPokemon : {};
       // Slim entries store only speciesId — look up display fields at render
-      // time. Legacy entries may still carry p.name / p.spriteUrl; prefer
-      // them when present so a mid-migration render still works.
-      const name   = p.nickname || p.name || getSpeciesName(p.speciesId);
-      const sprite = p.spriteUrl
-        || `${SPRITE_BASE}${p.isShiny ? 'shiny/' : ''}${p.speciesId}.png`;
-      const itemHtml = p.heldItem
-        ? `<div style="display:flex;align-items:center;gap:2px;font-size:7px;color:var(--text-dim);">${itemIconHtml(p.heldItem, 12)}</div>`
+      // time. Legacy entries may still carry p.name / p.nickname; escape them
+      // before inserting into the Hall of Fame markup.
+      const speciesId = hofNumber(p.speciesId, 0);
+      const name = escapeHofText(p.nickname || p.name || getSpeciesName(speciesId));
+      const sprite = hofSpriteUrl(speciesId, !!p.isShiny);
+      const level = hofNumber(p.level, 1);
+      const safeItemIcon = hofItemIconHtml(p.heldItem);
+      const itemHtml = safeItemIcon
+        ? `<div style="display:flex;align-items:center;gap:2px;font-size:7px;color:var(--text-dim);">${safeItemIcon}</div>`
         : '';
       return `
       <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
         <img src="${sprite}" style="width:48px;height:48px;image-rendering:pixelated;${p.isShiny ? 'filter:drop-shadow(0 0 4px gold);' : ''}" title="${name}">
         <div style="font-size:7px;color:${p.isShiny ? 'gold' : 'var(--text-dim)'};">${name}</div>
-        <div style="font-size:7px;color:var(--text-dim);">Lv.${p.level}</div>
+        <div style="font-size:7px;color:var(--text-dim);">Lv.${level}</div>
         ${itemHtml}
       </div>`;
     }).join('');
+    const stageNumber = hofNumber(e.stageNumber, 0);
+    const runNumber = hofNumber(e.runNumber, 0);
+    const entryTitle = e.endless
+      ? `Battle Tower: ${escapeHofText(getStageName(stageNumber))}`
+      : `Championship #${runNumber}`;
+    const date = escapeHofText(e.date || '');
     return `
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <span style="font-size:10px;color:gold;font-weight:bold;">${e.endless ? `Battle Tower: ${getStageName(e.stageNumber)}` : `Championship #${e.runNumber}`}${e.hardMode ? ' ☠️' : ''}${e.gen2Mode ? ' ⅠⅠ' : ''}</span>
-          <span style="font-size:9px;color:var(--text-dim);">${e.date}</span>
+          <span style="font-size:10px;color:gold;font-weight:bold;">${entryTitle}${e.hardMode ? ' ☠️' : ''}${e.gen2Mode ? ' ⅠⅠ' : ''}</span>
+          <span style="font-size:9px;color:var(--text-dim);">${date}</span>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">${pokemonHtml}</div>
       </div>`;
@@ -4691,7 +4741,7 @@ async function openHallOfFameModal() {
     <div style="background:var(--bg-main);border:2px solid var(--border);border-radius:12px;width:90%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
         <span style="font-family:'Press Start 2P',monospace;font-size:10px;color:gold;">Hall of Fame</span>
-        <button style="background:none;border:none;color:var(--text-main);font-size:16px;cursor:pointer;line-height:1;" onclick="document.getElementById('hof-modal').remove()">✕</button>
+        <button class="ach-modal-close" onclick="document.getElementById('hof-modal').remove()">✕</button>
       </div>
       ${filterChipsHtml}
       <div id="hof-entries" style="overflow-y:auto;padding:14px;font-family:'Press Start 2P',monospace;flex:1;">${renderEntries('all')}</div>

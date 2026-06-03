@@ -118,8 +118,14 @@ async function initGame() {
       syncGenButtons();
     };
   });
-  document.getElementById('btn-new-run').onclick  = () => selectedGen === 3 ? showGen3ComingSoonModal('Normal Mode') : startNewRun(false, selectedGen === 2);
-  document.getElementById('btn-hard-run').onclick = () => selectedGen === 3 ? showGen3ComingSoonModal('Nuzlocke Mode') : startNewRun(true,  selectedGen === 2);
+  document.getElementById('btn-new-run').onclick  = () => {
+    if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
+    selectedGen === 3 ? showGen3ComingSoonModal('Normal Mode') : startNewRun(false, selectedGen === 2);
+  };
+  document.getElementById('btn-hard-run').onclick = () => {
+    if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
+    selectedGen === 3 ? showGen3ComingSoonModal('Nuzlocke Mode') : startNewRun(true,  selectedGen === 2);
+  };
 
   const endlessBtn = document.getElementById('btn-endless-run');
   if (endlessBtn) {
@@ -127,6 +133,7 @@ async function initGame() {
       preloadStageRegionBackgrounds();
       endlessBtn.onmouseenter = () => preloadStageRegionBackgrounds();
       endlessBtn.onclick = () => {
+        if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
         preloadStageRegionBackgrounds();
         showEndlessStageSelect();
       };
@@ -167,7 +174,10 @@ async function initGame() {
   if (continueEndlessBtn) {
     if (localStorage.getItem('poke_endless_state') && localStorage.getItem('poke_current_run')) {
       continueEndlessBtn.style.display = '';
-      continueEndlessBtn.onclick = () => continueEndlessRun();
+      continueEndlessBtn.onclick = () => {
+        if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
+        continueEndlessRun();
+      };
     } else {
       continueEndlessBtn.style.display = 'none';
     }
@@ -177,6 +187,7 @@ async function initGame() {
   if (localStorage.getItem('poke_current_run') && !localStorage.getItem('poke_endless_state')) {
     continueBtn.style.display = '';
     continueBtn.onclick = async () => {
+      if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
       if (!loadRun()) return;
       if (state.currentNode && !state.currentNode.visited) {
         await onNodeClick(state.currentNode);
@@ -186,6 +197,11 @@ async function initGame() {
     };
   } else {
     continueBtn.style.display = 'none';
+  }
+
+  if (typeof applyLoginGateUI === 'function') applyLoginGateUI();
+  if (typeof isPlayerLoggedIn === 'function' && !isPlayerLoggedIn() && typeof requireLoginToPlay === 'function') {
+    requireLoginToPlay();
   }
 }
 
@@ -315,7 +331,7 @@ function showGen3ComingSoonModal(modeLabel = 'Normal Mode') {
     <div class="settings-modal-box" style="max-width:360px;">
       <div class="settings-modal-header">
         <span>Hoenn</span>
-        <button class="ach-modal-close" id="gen3-coming-soon-close">x</button>
+        <button class="ach-modal-close" id="gen3-coming-soon-close">✕</button>
       </div>
       <div style="padding:18px 14px;text-align:center;font-family:'Press Start 2P',monospace;">
         <div style="font-size:14px;line-height:1.6;color:var(--gold);margin-bottom:12px;">COMING SOON</div>
@@ -350,6 +366,7 @@ function showGen3ComingSoonModal(modeLabel = 'Normal Mode') {
 }
 
 async function startNewRun(nuzlockeMode = false, gen2Mode = false, forcedStarterId = null) {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   runGeneration++;
   clearEndlessState();
   const savedTrainer = localStorage.getItem('poke_trainer') || null;
@@ -431,7 +448,7 @@ async function showStarterSelect() {
     const panel = document.getElementById('starter-region-panel');
     if (panel) {
       const region = endlessState.currentRegion;
-      const header = `<div class="hud-label">Upcoming Region</div><div class="hud-label" style="font-size:7px;opacity:0.7;">${getStageName(region.stageNum)} R${region.regionNum}</div>`;
+      const header = `<div class="starter-region-header"><div class="starter-region-title">Upcoming<br>Region</div><div class="starter-region-meta">${getStageName(region.stageNum)} R${region.regionNum}</div></div>`;
       const rows = region.trainers.map((trainer, i) => {
         const type = trainer.archetype?.type || '???';
         const name = trainer.archetype?.name || '???';
@@ -2903,6 +2920,7 @@ const REGION_STARTERS = [
 ];
 
 function showEndlessStageSelect() {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   const unlocked = Math.min(getUnlockedStageCount(), MAX_ACCESSIBLE_STAGE);
   const list = document.getElementById('stage-select-list');
   if (!list) return;
@@ -2930,6 +2948,7 @@ function showEndlessStageSelect() {
 }
 
 async function startEndlessRun(stageNum = 1, forcedStarterId = null, forcedStarterShiny = null) {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   runGeneration++;
   clearSavedRun();
   const seed = (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
@@ -3000,6 +3019,7 @@ function confirmResetRun() {
 }
 
 async function continueEndlessRun() {
+  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   try {
     if (!loadRun()) return;
     if (!loadEndlessState()) return;
