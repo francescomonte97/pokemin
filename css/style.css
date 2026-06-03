@@ -1887,6 +1887,18 @@ h1, h2, .pixel-font {
   justify-content: center;
   padding: 16px;
 }
+.dex-loading {
+  grid-column: 1 / -1;
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-family: "Press Start 2P", monospace;
+  font-size: 9px;
+  line-height: 1.7;
+  text-align: center;
+}
 .dex-modal-box {
   background: #160606;
   width: 100%;
@@ -2392,6 +2404,26 @@ h1, h2, .pixel-font {
   color: var(--accent);
   border-color: var(--accent);
 }
+.pwa-install-btn {
+  width: 100%;
+  margin: 0;
+  font-family: "Press Start 2P", monospace;
+  font-size: 8px;
+  line-height: 1.5;
+  text-align: center;
+}
+.pwa-install-btn.pwa-installed,
+.pwa-install-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  filter: grayscale(0.4);
+}
+.settings-action-row {
+  display: flex;
+  padding: 12px;
+  border-bottom: 1px solid #15283c;
+  background: #071522;
+}
 
 #btn-new-run  { border-color: #1a60cc; box-shadow: 3px 3px 0 0 #1a60cc; color: #1a60cc; }
 #btn-new-run:hover  { box-shadow: 4px 4px 0 0 #1a60cc; }
@@ -2832,6 +2864,7 @@ body.dark-mode .settings-section-title  { background: #1e1c14; color: #5090d5; b
 body.dark-mode .settings-row            { background: #252118; border-bottom-color: #3a3428; color: #e0dcd0; }
 body.dark-mode .settings-row:hover      { background: #2e2820; }
 body.dark-mode .settings-label          { color: #e0dcd0; }
+body.dark-mode .settings-action-row     { background: #252118; border-bottom-color: #3a3428; }
 
 body.dark-mode .btn-primary {
   background: #252118;

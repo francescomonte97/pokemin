@@ -3376,6 +3376,10 @@ function openSettingsModal() {
         ${row('Regular Trainers', 'autoSkipBattles', s.autoSkipAllBattles)}
         ${row('All Fights', 'autoSkipAllBattles')}
         ${row('Evolutions', 'autoSkipEvolve')}
+        <div class="settings-section-title">App</div>
+        <div class="settings-action-row">
+          ${typeof pwaInstallButtonHtml === 'function' ? pwaInstallButtonHtml('settings-install') : ''}
+        </div>
       </div>`;
 
     modal.querySelectorAll('.settings-checkbox').forEach(cb => {
@@ -3387,6 +3391,7 @@ function openSettingsModal() {
         render();
       };
     });
+    if (typeof bindPwaInstallButtons === 'function') bindPwaInstallButtons(modal);
 
   }
 
@@ -3450,12 +3455,9 @@ async function openPokedexModal(initialTab = 'normal') {
   const existing = document.getElementById('pokedex-modal');
   if (existing) { existing.remove(); return; }
 
-  // Names and types now come from the bundled static pokedex (saves dropped
-  // those fields per entry to shrink cloud payloads). Await the load so the
-  // first paint isn't full of "???" if the JSON is still in flight.
-  if (typeof loadStaticPokedex === 'function') {
-    try { await loadStaticPokedex(); } catch {}
-  }
+  const pokedexReady = (typeof loadStaticPokedex === 'function')
+    ? loadStaticPokedex().catch(() => {})
+    : Promise.resolve();
 
   const BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
@@ -3597,7 +3599,9 @@ async function openPokedexModal(initialTab = 'normal') {
           <span id="dex-progress-label-all" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:7px;font-weight:bold;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);pointer-events:none;"></span>
         </div>
       </div>
-      <div class="dex-grid" id="dex-grid-content"></div>
+      <div class="dex-grid" id="dex-grid-content">
+        <div class="dex-loading">Loading Pokédex...</div>
+      </div>
     </div>`;
 
   function switchTab(tab) {
@@ -3649,9 +3653,17 @@ async function openPokedexModal(initialTab = 'normal') {
   }
 
   modal.querySelectorAll('.dex-tab').forEach(b =>
-    b.addEventListener('click', () => switchTab(b.dataset.tab)));
+    b.addEventListener('click', async () => {
+      document.getElementById('dex-grid-content').innerHTML = '<div class="dex-loading">Loading Pokédex...</div>';
+      await pokedexReady;
+      if (document.body.contains(modal)) switchTab(b.dataset.tab);
+    }));
   document.body.appendChild(modal);
-  switchTab(initialTab);
+  modal.querySelector(`.dex-tab[data-tab="${initialTab}"]`)?.classList.add('active');
+  requestAnimationFrame(async () => {
+    await pokedexReady;
+    if (document.body.contains(modal)) switchTab(initialTab);
+  });
 }
 
 function openShinyDexModal() { openPokedexModal('shiny'); }

@@ -278,6 +278,7 @@ function showMinWelcomeModalIfNeeded() {
               <button class="btn-secondary min-welcome-lang" data-lang="it" style="font-family:'Press Start 2P',monospace;font-size:7px;flex:1;border-color:${lang === 'it' ? '#72d6ff' : 'var(--border)'};color:${lang === 'it' ? '#72d6ff' : 'var(--text-dim)'};">Italiano</button>
               <button class="btn-secondary min-welcome-lang" data-lang="en" style="font-family:'Press Start 2P',monospace;font-size:7px;flex:1;border-color:${lang === 'en' ? '#72d6ff' : 'var(--border)'};color:${lang === 'en' ? '#72d6ff' : 'var(--text-dim)'};">English</button>
             </div>
+            ${typeof pwaInstallButtonHtml === 'function' ? `<div style="margin-bottom:14px;">${pwaInstallButtonHtml('min-welcome-install')}</div>` : ''}
             <div style="border:2px solid #72d6ff;background:linear-gradient(180deg,rgba(22,82,112,0.78),rgba(8,22,32,0.92));border-radius:10px;padding:12px;margin-bottom:14px;box-shadow:0 0 0 1px rgba(255,255,255,0.14) inset;">
               <div style="font-size:10px;line-height:1.7;color:#b9efff;text-align:center;text-shadow:1px 1px 0 #000;">${t.badge}</div>
             </div>
@@ -304,6 +305,7 @@ function showMinWelcomeModalIfNeeded() {
       });
       const checkbox = modal.querySelector('#min-welcome-check');
       const continueBtn = modal.querySelector('#min-welcome-continue');
+      if (typeof bindPwaInstallButtons === 'function') bindPwaInstallButtons(modal);
       checkbox?.addEventListener('change', () => {
         continueBtn.disabled = !checkbox.checked;
         continueBtn.style.opacity = checkbox.checked ? '' : '0.45';
