@@ -49,7 +49,8 @@ const PRIMITIVE_KEYS = new Set([
 ]);
 
 function _getSaveUuid() { return localStorage.getItem('poke_save_uuid'); }
-function _getUsername()  { return localStorage.getItem('poke_username'); }
+function _getServerUsername()  { return localStorage.getItem('poke_username'); }
+function _getDisplayUsername() { return localStorage.getItem('poke_username_1') || _getServerUsername(); }
 
 function _getMeta() {
   try { return JSON.parse(localStorage.getItem('poke_meta') || '{}'); }
@@ -388,7 +389,7 @@ function _updateSyncUI() {
   // when we land on online or offline.
   btn.classList.remove('cloud-loading');
   if (info) info.classList.remove('cloud-loading');
-  const username = _getUsername();
+  const username = _getDisplayUsername();
   if (username) {
     btn.onclick = _showAccountModal;
     if (_cloudStatus === 'loading') {
@@ -475,6 +476,7 @@ function _showAuthModal() {
       if (!res.ok) { showErr(data.error || 'Something went wrong.'); btn.disabled = false; btn.textContent = endpoint === '/login' ? 'Log In' : 'Register'; return; }
       localStorage.setItem('poke_save_uuid', data.uuid);
       localStorage.setItem('poke_username', data.username);
+      localStorage.setItem('poke_username_1', data.username);
       modal.remove();
       _updateSyncUI();
       await _loadFromServer();
@@ -496,7 +498,7 @@ function _showAuthModal() {
 
 function _showAccountModal() {
   document.getElementById('save-auth-modal')?.remove();
-  const username = _getUsername();
+  const username = _getDisplayUsername();
   const modal = document.createElement('div');
   modal.id = 'save-auth-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999;';
@@ -519,6 +521,7 @@ function _showAccountModal() {
     if (!confirm('Sign out? Your local save will remain but won\'t sync until you log back in.')) return;
     localStorage.removeItem('poke_save_uuid');
     localStorage.removeItem('poke_username');
+    localStorage.removeItem('poke_username_1');
     localStorage.removeItem('poke_last_cloud_sync');
     modal.remove();
     _updateSyncUI();
