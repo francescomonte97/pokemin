@@ -257,7 +257,7 @@ function showMinWelcomeModalIfNeeded() {
       },
     };
 
-    let lang = 'it';
+    let lang = 'en';
     const modal = document.createElement('div');
     modal.id = 'min-welcome-modal';
     modal.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;padding:16px;';
