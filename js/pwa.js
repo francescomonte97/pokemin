@@ -14,7 +14,7 @@ function updatePwaInstallButtons() {
   document.querySelectorAll('[data-pwa-install-button]').forEach(btn => {
     btn.disabled = installed;
     btn.classList.toggle('pwa-installed', installed);
-    btn.textContent = installed ? 'App installed' : 'Scarica app';
+    btn.textContent = installed ? 'App installed' : 'Download app';
   });
 }
 
@@ -25,7 +25,7 @@ async function promptInstallPwa() {
   }
 
   if (!deferredPwaPrompt) {
-    alert('Se il pulsante installazione del browser non compare ancora, apri il menu del browser e scegli "Aggiungi alla schermata Home" o "Installa app".');
+    alert('If the browser install button does not appear yet, open your browser menu and choose "Add to Home Screen" or "Install app".');
     return false;
   }
 
@@ -46,7 +46,7 @@ function bindPwaInstallButtons(root = document) {
 }
 
 function pwaInstallButtonHtml(extraClass = '') {
-  return `<button type="button" class="btn-primary pwa-install-btn ${extraClass}" data-pwa-install-button>Scarica app</button>`;
+  return `<button type="button" class="btn-primary pwa-install-btn ${extraClass}" data-pwa-install-button>Download app</button>`;
 }
 
 window.addEventListener('beforeinstallprompt', event => {

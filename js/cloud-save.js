@@ -259,7 +259,6 @@ function applyLoginGateUI() {
     'button[onclick="openPokedexModal()"]',
     'button[onclick="openAchievementsModal()"]',
     'button[onclick="openHallOfFameModal()"]',
-    'button[onclick="openSettingsModal()"]',
   ];
   document.querySelectorAll(gatedSelectors.join(',')).forEach(btn => {
     if (!btn.dataset.originalTitle) btn.dataset.originalTitle = btn.title || '';

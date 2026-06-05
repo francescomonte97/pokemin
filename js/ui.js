@@ -3375,12 +3375,12 @@ function applyDarkMode() {
 }
 
 function openSettingsModal() {
-  if (typeof requireLoginToPlay === 'function' && !requireLoginToPlay()) return;
   const existing = document.getElementById('settings-modal');
   if (existing) { existing.remove(); return; }
 
   const modal = document.createElement('div');
   modal.id = 'settings-modal';
+  let pokeKeyRevealed = false;
 
   function row(label, key, disabled = false) {
     const s = getSettings();
@@ -3403,6 +3403,9 @@ function openSettingsModal() {
   function render() {
     const s = getSettings();
     const pokeKey = typeof getPokeKeyForDisplay === 'function' ? getPokeKeyForDisplay() : '';
+    const canCreatePokeKey = typeof isPlayerLoggedIn === 'function' && isPlayerLoggedIn();
+    const maskedPokeKey = pokeKey ? '*'.repeat(Math.min(24, Math.max(12, pokeKey.length))) : '';
+    const pokeKeyText = pokeKeyRevealed ? pokeKey : maskedPokeKey;
     modal.innerHTML = `
       <div class="settings-modal-box">
         <div class="settings-modal-header">
@@ -3417,8 +3420,8 @@ function openSettingsModal() {
         ${row('Evolutions', 'autoSkipEvolve')}
         <div class="settings-section-title">Account</div>
         <div class="settings-action-row">
-          ${pokeKey ? `<div style="font-size:8px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;word-break:break-all;">Poke_key<br><b style="color:var(--text);">${escapeSettingsText(pokeKey)}</b></div>` : ''}
-          <button type="button" id="settings-poke-key-btn" class="btn-secondary" style="width:100%;">${pokeKey ? 'Copy Poke_key' : 'Create Poke_key'}</button>
+          ${pokeKey ? `<button type="button" id="settings-poke-key-reveal" class="btn-secondary" style="width:100%;font-size:8px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;word-break:break-all;text-align:center;">Poke_key<br><b style="color:var(--text);">${escapeSettingsText(pokeKeyText)}</b></button>` : ''}
+          <button type="button" id="settings-poke-key-btn" class="btn-secondary" style="width:100%;" ${!pokeKey && !canCreatePokeKey ? 'disabled' : ''}>${pokeKey ? 'Copy Poke_key' : canCreatePokeKey ? 'Create Poke_key' : 'Log in to create Poke_key'}</button>
         </div>
         <div class="settings-section-title">App</div>
         <div class="settings-action-row">
@@ -3436,6 +3439,10 @@ function openSettingsModal() {
       };
     });
     if (typeof bindPwaInstallButtons === 'function') bindPwaInstallButtons(modal);
+    modal.querySelector('#settings-poke-key-reveal')?.addEventListener('click', () => {
+      pokeKeyRevealed = !pokeKeyRevealed;
+      render();
+    });
     modal.querySelector('#settings-poke-key-btn')?.addEventListener('click', async () => {
       const currentPokeKey = typeof getPokeKeyForDisplay === 'function' ? getPokeKeyForDisplay() : '';
       if (currentPokeKey && navigator.clipboard?.writeText) {
