@@ -459,7 +459,7 @@ async function showStarterSelect() {
         const rowClass = isBigBoss ? 'region-stage-row boss' : 'region-stage-row';
         const speciesAttr = (trainer.speciesIds || []).join(',');
         return `<div class="${rowClass}" data-species="${speciesAttr}" style="cursor:default;">
-          <span class="type-badge type-${typeClass}" style="font-size:6px;padding:1px 3px;">${type}</span>
+          <span class="region-stage-types"><span class="type-badge type-${typeClass}" style="font-size:6px;padding:1px 3px;">${type}</span></span>
           <span class="region-stage-name">${isBigBoss ? '★ ' : ''}${name}</span>
           <span class="region-stage-level">Lv${trainer.displayLevel ?? trainer.level}</span>
         </div>`;

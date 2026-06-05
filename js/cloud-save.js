@@ -27,6 +27,7 @@ function _fetchWithTimeout(url, opts = {}, ms = SAVE_FETCH_TIMEOUT_MS.load) {
 // refocus). Every fetch helper below calls _setCloudStatus() with its
 // outcome and _updateSyncUI() re-renders automatically.
 let _cloudStatus = 'loading';
+let _lastPokeKeyServerDownAlert = 0;
 
 function _setCloudStatus(status) {
   if (_cloudStatus === status) return;
@@ -63,6 +64,178 @@ function _escapeCloudText(value) {
 function _queuePlayerStats(reason = 'sync', options = {}) {
   if (!_getSaveUuid() || typeof window.queuePlayerStatsToFirestore !== 'function') return;
   window.queuePlayerStatsToFirestore(reason, options);
+}
+
+function _getFirestoreFallback() {
+  return typeof window !== 'undefined' ? window.pokeFirestoreAuthFallback : null;
+}
+
+function _isFirestoreFallbackProfile() {
+  return !!localStorage.getItem('poke_uuid_1');
+}
+
+function _setFallbackAccessKey(accessKey) {
+  if (!accessKey) return;
+  localStorage.setItem('poke_fallback_access_key', accessKey);
+}
+
+function _getFallbackAccessKey() {
+  return localStorage.getItem('poke_fallback_access_key') || '';
+}
+
+function _pokeKeyShownKey(accessKey) {
+  return `poke_key_seen_${String(accessKey || '').slice(0, 12)}`;
+}
+
+function _showPokeKeyModal(accessKey, options = {}) {
+  if (!accessKey) return;
+  const force = !!options.force;
+  const seenKey = _pokeKeyShownKey(accessKey);
+  if (!force && localStorage.getItem(seenKey) === '1') return;
+  localStorage.setItem(seenKey, '1');
+
+  document.getElementById('poke-key-modal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'poke-key-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;z-index:10000;';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:2px solid var(--border);box-shadow:4px 4px 0 #000;padding:20px;max-width:380px;width:90%;font-family:monospace;display:flex;flex-direction:column;gap:12px;text-align:center;">
+      <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:#ffd84a;">POKE_KEY</div>
+      <div style="font-size:10px;color:var(--text-dim);line-height:1.6;">Questa è la tua seconda chiave di accesso. Puoi usarla al posto della password normale per entrare e ritrovare i tuoi dati.</div>
+      <button id="poke-key-copy-btn" class="btn-secondary" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px;font-size:12px;line-height:1.5;word-break:break-all;">${_escapeCloudText(accessKey)}</button>
+      <button id="poke-key-close-btn" class="btn-secondary" style="width:100%;">OK</button>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('poke-key-copy-btn').onclick = async () => {
+    await _copyPokeKey(accessKey);
+  };
+  document.getElementById('poke-key-close-btn').onclick = () => modal.remove();
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+async function _copyPokeKey(accessKey) {
+  if (!accessKey) return false;
+  try {
+    await navigator.clipboard.writeText(accessKey);
+    alert('Poke_key copiata.');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function _alertSavedPokeKeyForServerDown() {
+  const accessKey = _getFallbackAccessKey();
+  if (!accessKey) return;
+  const now = Date.now();
+  if (now - _lastPokeKeyServerDownAlert < 60000) return;
+  _lastPokeKeyServerDownAlert = now;
+  alert(`Cloud save non disponibile.\n\nPuoi accedere ai tuoi dati usando questa Poke_key nel campo password:\n\n${accessKey}`);
+}
+
+async function _ensurePokeKeyForCurrentProfile(options = {}) {
+  const uuid = _getSaveUuid();
+  const username = _getServerUsername();
+  const show = !!options.show;
+  if (!uuid || !username) return '';
+
+  const existingKey = _getFallbackAccessKey();
+  if (existingKey) {
+    if (show) _showPokeKeyModal(existingKey);
+    return existingKey;
+  }
+
+  try {
+    const data = await _provisionFirestoreAccess(username, uuid);
+    const accessKey = data?.accessKey || '';
+    if (show) _showPokeKeyModal(accessKey);
+    return accessKey;
+  } catch (err) {
+    console.warn('Poke_key provisioning failed:', err);
+    return '';
+  }
+}
+
+function showPokeKeyOption() {
+  return _ensurePokeKeyForCurrentProfile({ show: true });
+}
+
+function getPokeKeyForDisplay() {
+  return _getFallbackAccessKey();
+}
+
+async function _completeFirestoreAuth(data, modal, accessKeyOverride = '') {
+  const accessKey = data.accessKey || accessKeyOverride;
+  localStorage.setItem('poke_save_uuid', data.uuid_1 || data.uuid);
+  localStorage.setItem('poke_uuid_1', data.uuid_1 || data.uuid);
+  localStorage.setItem('poke_username', data.username);
+  localStorage.setItem('poke_username_1', data.username);
+  localStorage.setItem('poke_cloud_provider', 'firestore_fallback');
+  _setFallbackAccessKey(accessKey);
+  _setCloudStatus('online');
+  _queuePlayerStats('fallback_auth', { force: true });
+  modal.remove();
+  _updateSyncUI();
+  applyLoginGateUI();
+  await _loadFromFirestoreFallback();
+  _showPokeKeyModal(accessKey);
+  if (typeof initGame === 'function') initGame();
+}
+
+async function _provisionFirestoreAccess(username, uuid) {
+  const fallback = _getFirestoreFallback();
+  if (!fallback?.provision || !username || !uuid) return null;
+  const data = await fallback.provision(username, uuid);
+  if (data?.accessKey) _setFallbackAccessKey(data.accessKey);
+  return data;
+}
+
+async function _mirrorSaveToFirestore(save, reason = 'firestore_mirror') {
+  const fallback = _getFirestoreFallback();
+  const uuid = _getSaveUuid();
+  if (!fallback?.saveLocal || !uuid || !save) return false;
+  await fallback.saveLocal(uuid, save);
+  _queuePlayerStats(reason, { force: true });
+  return true;
+}
+
+async function _pushLocalToFirestoreFallback(reason = 'fallback_push') {
+  const fallback = _getFirestoreFallback();
+  const uuid = _getSaveUuid();
+  if (!fallback?.saveLocal || !uuid) return false;
+  const save = _getLocalSave();
+  await fallback.saveLocal(uuid, save);
+  localStorage.setItem('poke_last_cloud_sync', String(save.lastSaved));
+  localStorage.setItem('poke_cloud_provider', 'firestore_fallback');
+  _setCloudStatus('online');
+  _queuePlayerStats(reason, { force: true });
+  return true;
+}
+
+async function _loadFromFirestoreFallback() {
+  const fallback = _getFirestoreFallback();
+  const uuid = _getSaveUuid();
+  if (!fallback?.loadSave || !uuid) return false;
+  const cloudSave = await fallback.loadSave(uuid);
+  if (!cloudSave) {
+    await _pushLocalToFirestoreFallback('fallback_seed');
+    return true;
+  }
+
+  const hasLocal = SYNC_KEYS.some(k => localStorage.getItem(k) !== null);
+  const firstTime = !localStorage.getItem('poke_last_cloud_sync');
+  if (hasLocal && firstTime) {
+    if (confirm('A fallback cloud save was found. Load it? (Local progress will be overwritten)')) {
+      _applyCloudSave(cloudSave);
+    }
+    await _pushLocalToFirestoreFallback('fallback_merge');
+  } else {
+    _applyCloudSave(cloudSave);
+    await _pushLocalToFirestoreFallback('fallback_merge');
+  }
+  localStorage.setItem('poke_cloud_provider', 'firestore_fallback');
+  _setCloudStatus('online');
+  return true;
 }
 
 function isPlayerLoggedIn() {
@@ -342,6 +515,10 @@ function _applyCloudSave(save) {
 async function _pushLocal() {
   const uuid = _getSaveUuid();
   if (!uuid) return;
+  if (_isFirestoreFallbackProfile()) {
+    await _pushLocalToFirestoreFallback('fallback_push');
+    return;
+  }
   try {
     const save = _getLocalSave();
     const res = await _fetchWithTimeout(`${SAVE_SERVER}/save/${uuid}`, {
@@ -353,11 +530,23 @@ async function _pushLocal() {
       localStorage.setItem('poke_last_cloud_sync', String(save.lastSaved));
       _setCloudStatus('online');
       _queuePlayerStats('cloud_push');
+      try {
+        await _mirrorSaveToFirestore(save, 'firestore_mirror_after_server_push');
+      } catch (fallbackErr) {
+        console.warn('Firestore mirror push failed:', fallbackErr);
+      }
     } else {
       _setCloudStatus('offline');
     }
   } catch (e) {
     console.warn('Cloud push failed:', e);
+    _alertSavedPokeKeyForServerDown();
+    try {
+      await _pushLocalToFirestoreFallback('fallback_push_after_server_error');
+      return;
+    } catch (fallbackErr) {
+      console.warn('Firestore fallback push failed:', fallbackErr);
+    }
     _setCloudStatus('offline');
   }
 }
@@ -368,6 +557,15 @@ async function _pushLocal() {
 async function syncToCloud() {
   const uuid = _getSaveUuid();
   if (!uuid || _syncing) return;
+  if (_isFirestoreFallbackProfile()) {
+    _syncing = true;
+    try {
+      await _loadFromFirestoreFallback();
+    } finally {
+      _syncing = false;
+    }
+    return;
+  }
   _syncing = true;
   try {
     // Only push when the pull actually merged. If the pull failed (timeout,
@@ -388,9 +586,15 @@ async function syncToCloud() {
       }
     } catch (e) {
       console.warn('Cloud pull during sync failed:', e);
-      _setCloudStatus('offline');
+      _alertSavedPokeKeyForServerDown();
+      try {
+        pulled = await _loadFromFirestoreFallback();
+      } catch (fallbackErr) {
+        console.warn('Firestore fallback pull during sync failed:', fallbackErr);
+      }
+      if (!pulled) _setCloudStatus('offline');
     }
-    if (pulled) await _pushLocal();
+    if (pulled && !_isFirestoreFallbackProfile()) await _pushLocal();
   } finally {
     _syncing = false;
   }
@@ -399,6 +603,10 @@ async function syncToCloud() {
 async function _loadFromServer() {
   const uuid = _getSaveUuid();
   if (!uuid) return;
+  if (_isFirestoreFallbackProfile()) {
+    await _loadFromFirestoreFallback();
+    return;
+  }
   try {
     const res = await _fetchWithTimeout(`${SAVE_SERVER}/save/${uuid}`, {}, SAVE_FETCH_TIMEOUT_MS.load);
     if (!res.ok) { _setCloudStatus('online'); await _pushLocal(); return; }
@@ -420,6 +628,13 @@ async function _loadFromServer() {
     }
   } catch (e) {
     console.warn('Load from server failed:', e);
+    _alertSavedPokeKeyForServerDown();
+    try {
+      await _loadFromFirestoreFallback();
+      return;
+    } catch (fallbackErr) {
+      console.warn('Firestore fallback load failed:', fallbackErr);
+    }
     _setCloudStatus('offline');
   }
 }
@@ -465,7 +680,7 @@ function _updateSyncUI() {
       btn.textContent = `☁ ${username} ⚠ offline`;
       btn.style.color = '#e0a050';
       if (info) {
-        info.textContent = '⚠ save server unreachable — progress saved locally only';
+        info.textContent = '⚠ cloud save non disponibile — progressi salvati sul dispositivo';
         info.style.display = 'block';
         info.style.color = '#e0a050';
       }
@@ -489,9 +704,10 @@ function _showAuthModal(options = {}) {
     <div style="background:var(--bg2);border:2px solid var(--border);padding:24px;max-width:360px;width:90%;font-family:monospace;display:flex;flex-direction:column;gap:10px;">
       <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);">☁ CLOUD SAVE</div>
       ${required ? '<div style="font-size:10px;color:#ffd84a;line-height:1.5;">Log in or register to play and access your saved progress.</div>' : ''}
+      <div style="font-size:9px;color:var(--text-dim);line-height:1.45;">Puoi usare la tua Poke_key nel campo password per accedere ai tuoi dati.</div>
       <input id="auth-username" placeholder="Username" autocomplete="username"
         style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px;font-size:12px;font-family:monospace;">
-      <input id="auth-password" type="password" placeholder="Password" autocomplete="current-password"
+      <input id="auth-password" type="password" placeholder="Password / Poke_key" autocomplete="current-password"
         style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px;font-size:12px;font-family:monospace;">
       <div id="auth-error" style="color:#e05050;font-size:9px;display:none;"></div>
       <div style="display:flex;gap:8px;">
@@ -520,19 +736,67 @@ function _showAuthModal(options = {}) {
       }, SAVE_FETCH_TIMEOUT_MS.auth);
       _setCloudStatus('online');
       const data = await res.json();
-      if (!res.ok) { showErr(data.error || 'Something went wrong.'); btn.disabled = false; btn.textContent = endpoint === '/login' ? 'Log In' : 'Register'; return; }
+      if (!res.ok) {
+        const fallback = _getFirestoreFallback();
+        if (endpoint === '/login' && fallback?.login) {
+          try {
+            const fallbackData = await fallback.login(username, password);
+            await _completeFirestoreAuth(fallbackData, modal, password);
+            return;
+          } catch (fallbackErr) {
+            console.warn('Poke_key login failed:', fallbackErr);
+          }
+        }
+        showErr(data.error || 'Something went wrong.'); btn.disabled = false; btn.textContent = endpoint === '/login' ? 'Log In' : 'Register'; return;
+      }
+      const previousUuid = _getSaveUuid();
+      const previousUsername = _getServerUsername();
+      const previousAccessKey = _getFallbackAccessKey();
+      const sameProfile = previousUuid === data.uuid && previousUsername === data.username;
+
       localStorage.setItem('poke_save_uuid', data.uuid);
       localStorage.setItem('poke_username', data.username);
       localStorage.setItem('poke_username_1', data.username);
+      localStorage.removeItem('poke_uuid_1');
+      localStorage.removeItem('poke_cloud_provider');
+      if (!sameProfile) localStorage.removeItem('poke_fallback_access_key');
+
+      let accessKey = sameProfile ? previousAccessKey : '';
+      if (!accessKey) {
+        try {
+          const fallbackAccount = await _provisionFirestoreAccess(data.username, data.uuid);
+          accessKey = fallbackAccount?.accessKey || '';
+        } catch (fallbackErr) {
+          console.warn('Firestore access key provisioning failed:', fallbackErr);
+        }
+      }
       _queuePlayerStats('auth', { force: true });
       modal.remove();
       _updateSyncUI();
       applyLoginGateUI();
       await _loadFromServer();
+      _showPokeKeyModal(accessKey);
       if (typeof initGame === 'function') initGame();
     } catch (e) {
       _setCloudStatus('offline');
-      showErr('Could not reach save server.'); btn.disabled = false; btn.textContent = endpoint === '/login' ? 'Log In' : 'Register';
+      _alertSavedPokeKeyForServerDown();
+      const fallback = _getFirestoreFallback();
+      const action = endpoint === '/login' ? 'login' : 'register';
+      if (!fallback?.[action]) {
+        showErr('Accesso non riuscito. Puoi provare con la tua Poke_key.');
+        btn.disabled = false;
+        btn.textContent = endpoint === '/login' ? 'Log In' : 'Register';
+        return;
+      }
+      try {
+        const data = await fallback[action](username, password);
+        await _completeFirestoreAuth(data, modal, action === 'login' ? password : '');
+      } catch (fallbackErr) {
+        console.warn('Firestore auth fallback failed:', fallbackErr);
+        showErr(fallbackErr.message || 'Accesso non riuscito.');
+        btn.disabled = false;
+        btn.textContent = endpoint === '/login' ? 'Log In' : 'Register';
+      }
     }
   }
 
@@ -548,29 +812,35 @@ function _showAuthModal(options = {}) {
 function _showAccountModal() {
   document.getElementById('save-auth-modal')?.remove();
   const username = _escapeCloudText(_getDisplayUsername());
+  const fallbackKey = _escapeCloudText(_getFallbackAccessKey());
   const modal = document.createElement('div');
   modal.id = 'save-auth-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999;';
   const statusLine = _cloudStatus === 'online'
     ? `<div style="font-size:9px;color:var(--text-dim);">Saves sync automatically.</div>`
     : _cloudStatus === 'offline'
-    ? `<div style="font-size:10px;color:#e0a050;line-height:1.4;">⚠ <b>Save server unreachable.</b><br>Your progress is being saved locally and will sync automatically when the connection is restored.</div>`
-    : `<div style="font-size:10px;color:var(--text-dim);line-height:1.4;">… Checking save server</div>`;
+    ? `<div style="font-size:10px;color:#e0a050;line-height:1.4;">⚠ <b>Cloud save momentaneamente non disponibile.</b><br>I tuoi progressi restano sul dispositivo.</div>`
+    : `<div style="font-size:10px;color:var(--text-dim);line-height:1.4;">… Controllo cloud save</div>`;
   modal.innerHTML = `
     <div style="background:var(--bg2);border:2px solid var(--border);padding:24px;max-width:360px;width:90%;font-family:monospace;display:flex;flex-direction:column;gap:10px;">
       <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);">☁ CLOUD SAVE</div>
       <div style="font-size:11px;color:var(--text);">Signed in as <b>${username}</b></div>
       ${statusLine}
+      ${fallbackKey ? '<button id="account-poke-key-btn" class="btn-secondary" style="width:100%;">Copy Poke_key</button>' : ''}
       <button id="account-signout-btn" class="btn-secondary" style="width:100%;margin-top:4px;">Sign Out</button>
       <button id="account-close-btn" class="btn-secondary" style="width:100%;">Close</button>
     </div>`;
   document.body.appendChild(modal);
 
+  document.getElementById('account-poke-key-btn')?.addEventListener('click', () => _copyPokeKey(_getFallbackAccessKey()));
   document.getElementById('account-signout-btn').onclick = () => {
     if (!confirm('Sign out? Your local save will remain but won\'t sync until you log back in.')) return;
     localStorage.removeItem('poke_save_uuid');
     localStorage.removeItem('poke_username');
     localStorage.removeItem('poke_username_1');
+    localStorage.removeItem('poke_uuid_1');
+    localStorage.removeItem('poke_cloud_provider');
+    localStorage.removeItem('poke_fallback_access_key');
     localStorage.removeItem('poke_last_cloud_sync');
     modal.remove();
     _updateSyncUI();
@@ -584,6 +854,7 @@ async function initCloudSave() {
   _updateSyncUI();
   if (_getSaveUuid()) {
     _queuePlayerStats('init');
+    await _ensurePokeKeyForCurrentProfile({ show: true });
     await _loadFromServer();
   }
 

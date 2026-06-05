@@ -2954,7 +2954,7 @@ function renderEndlessRegionPanel(region, currentMapIndex) {
     const speciesAttr = (trainer.speciesIds || []).join(',');
 
     return `<div class="${rowClass}" data-species="${speciesAttr}" style="cursor:default;">
-      <span style="display:inline-flex;gap:1px;align-items:center;">${typeBadges}</span>
+      <span class="region-stage-types">${typeBadges}</span>
       <span class="region-stage-name">${statusIcon}${isBigBoss ? '★ ' : ''}${name}</span>
       <span class="region-stage-level">Lv${trainer.displayLevel ?? trainer.level}</span>
     </div>`;
@@ -2970,7 +2970,7 @@ function attachBossTeamTooltips(container) {
   if (!tip) {
     tip = document.createElement('div');
     tip.id = 'boss-team-tip';
-    tip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;display:none;gap:2px;align-items:center;padding:4px 6px;border:2px solid #4a4438;background:#181410;';
+    tip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;display:none;gap:2px;align-items:center;justify-content:center;flex-wrap:wrap;padding:4px 6px;border:2px solid #4a4438;background:#181410;max-width:min(220px,calc(100vw - 12px));';
     document.body.appendChild(tip);
   }
 
@@ -2983,8 +2983,22 @@ function attachBossTeamTooltips(container) {
       ).join('');
       tip.style.display = 'flex';
       const r = row.getBoundingClientRect();
-      tip.style.left = (r.right + 6) + 'px';
-      tip.style.top = r.top + 'px';
+      const margin = 6;
+      const tipRect = tip.getBoundingClientRect();
+      let left = r.right + margin;
+      if (left + tipRect.width > window.innerWidth - margin) {
+        left = r.left - tipRect.width - margin;
+      }
+      left = Math.max(margin, Math.min(left, window.innerWidth - tipRect.width - margin));
+
+      let top = r.top + (r.height / 2) - (tipRect.height / 2);
+      if (top + tipRect.height > window.innerHeight - margin) {
+        top = window.innerHeight - tipRect.height - margin;
+      }
+      top = Math.max(margin, top);
+
+      tip.style.left = `${left}px`;
+      tip.style.top = `${top}px`;
     });
     row.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
   });
@@ -3342,7 +3356,21 @@ function _runToastQueue() {
 
 // ---- Settings Modal ----
 
+const DARK_MODE_BACKGROUND_URL = 'https://pokelike.xyz/ui/backgroundDarkMode.jpg';
+let _darkModeBackgroundPreloaded = false;
+
+function preloadDarkModeBackground() {
+  if (_darkModeBackgroundPreloaded) return;
+  _darkModeBackgroundPreloaded = true;
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = DARK_MODE_BACKGROUND_URL;
+}
+
+preloadDarkModeBackground();
+
 function applyDarkMode() {
+  preloadDarkModeBackground();
   document.body.classList.toggle('dark-mode', !!getSettings().darkMode);
 }
 
@@ -3362,8 +3390,19 @@ function openSettingsModal() {
     </label>`;
   }
 
+  function escapeSettingsText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
   function render() {
     const s = getSettings();
+    const pokeKey = typeof getPokeKeyForDisplay === 'function' ? getPokeKeyForDisplay() : '';
     modal.innerHTML = `
       <div class="settings-modal-box">
         <div class="settings-modal-header">
@@ -3376,6 +3415,11 @@ function openSettingsModal() {
         ${row('Regular Trainers', 'autoSkipBattles', s.autoSkipAllBattles)}
         ${row('All Fights', 'autoSkipAllBattles')}
         ${row('Evolutions', 'autoSkipEvolve')}
+        <div class="settings-section-title">Account</div>
+        <div class="settings-action-row">
+          ${pokeKey ? `<div style="font-size:8px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;word-break:break-all;">Poke_key<br><b style="color:var(--text);">${escapeSettingsText(pokeKey)}</b></div>` : ''}
+          <button type="button" id="settings-poke-key-btn" class="btn-secondary" style="width:100%;">${pokeKey ? 'Copy Poke_key' : 'Create Poke_key'}</button>
+        </div>
         <div class="settings-section-title">App</div>
         <div class="settings-action-row">
           ${typeof pwaInstallButtonHtml === 'function' ? pwaInstallButtonHtml('settings-install') : ''}
@@ -3392,6 +3436,16 @@ function openSettingsModal() {
       };
     });
     if (typeof bindPwaInstallButtons === 'function') bindPwaInstallButtons(modal);
+    modal.querySelector('#settings-poke-key-btn')?.addEventListener('click', async () => {
+      const currentPokeKey = typeof getPokeKeyForDisplay === 'function' ? getPokeKeyForDisplay() : '';
+      if (currentPokeKey && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(currentPokeKey);
+        alert('Poke_key copiata.');
+      } else if (typeof showPokeKeyOption === 'function') {
+        await showPokeKeyOption();
+        render();
+      }
+    });
 
   }
 
@@ -4190,12 +4244,6 @@ const PATCH_NOTES = [
           'Battle Tower location labels in the Pokédex are now shown as approximate ranges (Early, Early-Middle, Middle, Middle-Late, Late) instead of specific floor numbers that could be misleading',
           'Shiny Dex completion achievement now requires catching all 5 Gen 1 legendary shinies — they were previously excluded from the check',
           'Pansage, Pansear, and Panpour now correctly evolve into Simisage, Simisear, and Simipour',
-        ],
-      },
-      {
-        heading: 'New',
-        entries: [
-          'Privacy Policy page added (linked from the title screen)',
         ],
       },
     ],

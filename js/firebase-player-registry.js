@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import { getAnalytics, isSupported as isAnalyticsSupported } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js';
-import { doc, getFirestore, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import { doc, getDoc, getFirestore, runTransaction, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBAbtomUhRnJOKdEkFZPdHo-3o4OYF8Aik',
@@ -15,6 +15,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const PLAYER_STATS_COLLECTION = 'player_stats';
+const FALLBACK_ACCOUNTS_COLLECTION = 'player_accounts';
+const FALLBACK_SAVES_COLLECTION = 'player_saves';
 const VISITOR_ID_ENDPOINT = 'https://pokemin-visitor-id.montefortefrancesco50.workers.dev/';
 const STATS_WRITE_INTERVAL_MS = 5 * 60 * 1000;
 const PLAYTIME_KEY = 'poke_playtime_ms';
@@ -74,6 +76,139 @@ function sanitizeDocId(value) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 64);
   return safe;
+}
+
+function normalizeAccountUsername(value) {
+  return sanitizeDocId(value).slice(0, 32);
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+}
+
+function createUuidV4() {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(b => b.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
+}
+
+async function hashFallbackPassword(password, saltBase64 = '') {
+  const cryptoApi = globalThis.crypto;
+  const enc = new TextEncoder();
+  const salt = saltBase64 ? base64ToBytes(saltBase64) : cryptoApi.getRandomValues(new Uint8Array(16));
+  const key = await cryptoApi.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await cryptoApi.subtle.deriveBits({
+    name: 'PBKDF2',
+    salt,
+    iterations: 120000,
+    hash: 'SHA-256',
+  }, key, 256);
+  return {
+    salt: bytesToBase64(salt),
+    hash: bytesToBase64(new Uint8Array(bits)),
+  };
+}
+
+function createAccessKey() {
+  const cryptoApi = globalThis.crypto;
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(18));
+  return [...bytes]
+    .map(b => b.toString(36).padStart(2, '0').slice(-2))
+    .join('')
+    .replace(/(.{6})/g, '$1-')
+    .replace(/-$/, '')
+    .toUpperCase();
+}
+
+function safeFallbackUsername(username) {
+  const clean = String(username || '').trim();
+  const key = normalizeAccountUsername(clean);
+  if (!key || clean.length > 24) throw new Error('invalid username');
+  return { username: clean, key };
+}
+
+async function provisionFallbackAccount(usernameValue, uuidValue, options = {}) {
+  const { username, key } = safeFallbackUsername(usernameValue);
+  const safeUuid = sanitizeUuid(uuidValue);
+  if (!safeUuid) throw new Error('invalid uuid');
+  const allowExisting = options.allowExisting !== false;
+
+  const accountRef = doc(db, FALLBACK_ACCOUNTS_COLLECTION, key);
+  const accessKey = createAccessKey();
+  const keyVerifier = await hashFallbackPassword(accessKey);
+  const visitorId = await loadCloudflareVisitorId();
+
+  await runTransaction(db, async tx => {
+    const existing = await tx.get(accountRef);
+    if (existing.exists() && !allowExisting) throw new Error('username already exists');
+    const base = existing.exists() ? existing.data() : {};
+    tx.set(accountRef, {
+      ...base,
+      username,
+      usernameKey: key,
+      uuid_1: safeUuid,
+      accessKeySalt: keyVerifier.salt,
+      accessKeyHash: keyVerifier.hash,
+      authProvider: 'firestore_fallback',
+      visitorId,
+      createdAt: base.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    tx.set(doc(db, FALLBACK_SAVES_COLLECTION, safeUuid), {
+      uuid_1: safeUuid,
+      usernameKey: key,
+      createdAt: base.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  });
+
+  return { uuid: safeUuid, uuid_1: safeUuid, username, accessKey };
+}
+
+async function registerFallbackAccount(usernameValue) {
+  const uuid_1 = createUuidV4();
+  return provisionFallbackAccount(usernameValue, uuid_1, { allowExisting: false });
+}
+
+async function loginFallbackAccount(usernameValue, accessKey) {
+  const { key } = safeFallbackUsername(usernameValue);
+  const snap = await getDoc(doc(db, FALLBACK_ACCOUNTS_COLLECTION, key));
+  if (!snap.exists()) throw new Error('invalid credentials');
+  const account = snap.data();
+  const salt = account.accessKeySalt || account.passwordSalt || '';
+  const expected = account.accessKeyHash || account.passwordHash || '';
+  const verifier = await hashFallbackPassword(accessKey, salt);
+  if (verifier.hash !== expected) throw new Error('invalid credentials');
+  return { uuid: account.uuid_1, uuid_1: account.uuid_1, username: account.username || usernameValue };
+}
+
+async function loadFallbackSave(uuid) {
+  const safeUuid = sanitizeUuid(uuid);
+  if (!safeUuid) return null;
+  const snap = await getDoc(doc(db, FALLBACK_SAVES_COLLECTION, safeUuid));
+  if (!snap.exists()) return null;
+  return snap.data()?.save || null;
+}
+
+async function saveFallbackSave(uuid, save) {
+  const safeUuid = sanitizeUuid(uuid);
+  if (!safeUuid || !save || typeof save !== 'object') return;
+  await setDoc(doc(db, FALLBACK_SAVES_COLLECTION, safeUuid), {
+    uuid_1: safeUuid,
+    save,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 function getPlayerStatsDocId(uuid) {
@@ -205,6 +340,14 @@ if (typeof document !== 'undefined') {
 }
 
 if (typeof window !== 'undefined') {
+  window.pokeFirestoreAuthFallback = {
+    login: loginFallbackAccount,
+    register: registerFallbackAccount,
+    provision: provisionFallbackAccount,
+    loadSave: loadFallbackSave,
+    saveLocal: saveFallbackSave,
+  };
+
   window.addEventListener('pagehide', () => {
     persistPlaytime();
     try {

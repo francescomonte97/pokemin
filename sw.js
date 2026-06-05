@@ -1,4 +1,4 @@
-const POKEMIN_CACHE = 'pokemin-pwa-v1';
+const POKEMIN_CACHE = 'pokemin-pwa-v10';
 
 const APP_SHELL = [
   './',
