@@ -225,7 +225,7 @@ async function _loadFromFirestoreFallback() {
   const hasLocal = SYNC_KEYS.some(k => localStorage.getItem(k) !== null);
   const firstTime = !localStorage.getItem('poke_last_cloud_sync');
   if (hasLocal && firstTime) {
-    if (confirm('A fallback cloud save was found. Load it? (Local progress will be overwritten)')) {
+    if (confirm('A cloud save was found. Load it? (Local progress will be overwritten)')) {
       _applyCloudSave(cloudSave);
     }
     await _pushLocalToFirestoreFallback('fallback_merge');
