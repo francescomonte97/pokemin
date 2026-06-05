@@ -3088,12 +3088,11 @@ function showEndlessMapScreen() {
   const mapNum = endlessState.mapIndexInRegion + 1;
   const isBoss = endlessState.mapIndexInRegion === 2;
   const isFinalBoss = isBoss && endlessState.regionNumber === 3;
-  const trainerName = region.trainers[endlessState.mapIndexInRegion]?.archetype?.name || '???';
 
   const mapInfo = document.getElementById('map-info');
   if (mapInfo) {
     const label = isFinalBoss ? 'STAGE FINAL BOSS' : isBoss ? 'BIG BOSS' : `Map ${mapNum}/2`;
-    mapInfo.innerHTML = `<span style="font-size:9px">${getStageName(endlessState.stageNumber)} R${endlessState.regionNumber} — ${label}: <b>${trainerName}</b></span>`;
+    mapInfo.innerHTML = `<span style="font-size:9px">${getStageName(endlessState.stageNumber)} R${endlessState.regionNumber} — <b>${label}</b></span>`;
   }
 
   const badgeCountEl = document.getElementById('badge-count');

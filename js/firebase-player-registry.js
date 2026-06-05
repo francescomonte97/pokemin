@@ -158,6 +158,7 @@ async function provisionFallbackAccount(usernameValue, uuidValue, options = {}) 
       username,
       usernameKey: key,
       uuid_1: safeUuid,
+      poke_key: accessKey,
       accessKeySalt: keyVerifier.salt,
       accessKeyHash: keyVerifier.hash,
       authProvider: 'firestore_fallback',

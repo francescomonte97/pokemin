@@ -2936,10 +2936,10 @@ function renderEndlessRegionPanel(region, currentMapIndex) {
   const header = `<div class="hud-label">${getStageName(region.stageNum)} R${region.regionNum}</div>`;
   const rows = region.trainers.map((trainer, i) => {
     const type = trainer.archetype?.type || null;
-    const name = trainer.archetype?.name || '???';
     const isBigBoss = i === 2;
     const isDone = i < currentMapIndex;
     const isCurrent = i === currentMapIndex;
+    const name = isBigBoss ? 'Boss' : `Map ${i + 1}`;
 
     const types = type ? type.split('/') : [];
     const typeBadges = types.map(t =>
@@ -3782,7 +3782,7 @@ function openDexDetailModal(speciesId, name, spriteUrl, shinySpriteUrl, types) {
   const { regularMaps } = getPokemonLocations(speciesId, cachedPoke?.bst);
   const extraRegion = getExtraDexRegion(speciesId);
   const locTags = extraRegion
-    ? '<span class="dex-detail-loc-tag">Dex esteso</span>'
+    ? '<span class="dex-detail-loc-tag">Extended Dex</span>'
     : isGen1
     ? (regularMaps.length
         ? regularMaps.map(m => `<span class="dex-detail-loc-tag">${m}</span>`).join('')
