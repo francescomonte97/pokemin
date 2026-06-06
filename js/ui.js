@@ -3420,7 +3420,7 @@ function openSettingsModal() {
         ${row('Evolutions', 'autoSkipEvolve')}
         <div class="settings-section-title">Account</div>
         <div class="settings-action-row">
-          ${pokeKey ? `<button type="button" id="settings-poke-key-reveal" class="btn-secondary" style="width:100%;font-size:8px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;word-break:break-all;text-align:center;">Poke_key<br><b style="color:var(--text);">${escapeSettingsText(pokeKeyText)}</b></button>` : ''}
+          ${pokeKey ? `<button type="button" id="settings-poke-key-reveal" class="settings-poke-key-reveal">Poke_key<span class="settings-poke-key-value">${escapeSettingsText(pokeKeyText)}</span></button>` : ''}
           <button type="button" id="settings-poke-key-btn" class="btn-secondary" style="width:100%;" ${!pokeKey && !canCreatePokeKey ? 'disabled' : ''}>${pokeKey ? 'Copy Poke_key' : canCreatePokeKey ? 'Create Poke_key' : 'Log in to create Poke_key'}</button>
         </div>
         <div class="settings-section-title">App</div>

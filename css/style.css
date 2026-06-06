@@ -2300,7 +2300,7 @@ h1, h2, .pixel-font {
 .settings-modal-box {
   background: #060c10;
   width: 100%;
-  max-width: 340px;
+  max-width: 420px;
   overflow: hidden;
   /* Retro blue pixel-window frame */
   border: 3px solid #2e6eb5;
@@ -2420,9 +2420,32 @@ h1, h2, .pixel-font {
 }
 .settings-action-row {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px;
   border-bottom: 1px solid #15283c;
   background: #071522;
+}
+.settings-poke-key-reveal {
+  width: 100%;
+  border: 1px solid #15283c;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 6px 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  line-height: 1.6;
+  text-align: center;
+  cursor: pointer;
+}
+.settings-poke-key-value {
+  display: block;
+  margin-top: 4px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 #btn-new-run  { border-color: #1a60cc; box-shadow: 3px 3px 0 0 #1a60cc; color: #1a60cc; }
