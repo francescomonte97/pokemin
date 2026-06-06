@@ -2053,6 +2053,24 @@ function getHallOfFame() {
   catch { return []; }
 }
 
+function isPecharuntSeedHallOfFameEntry(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  const team = Array.isArray(entry.team) ? entry.team : [];
+  return team.length === 1
+    && Number(team[0]?.speciesId) === 1025
+    && !entry.endless
+    && !entry.hardMode
+    && !entry.gen2Mode;
+}
+
+function getPlayableHallOfFame() {
+  return getHallOfFame().filter(entry => !isPecharuntSeedHallOfFameEntry(entry));
+}
+
+function hasPlayableHallOfFame() {
+  return getPlayableHallOfFame().length > 0;
+}
+
 function getUsedStarters() {
   try { return JSON.parse(localStorage.getItem('poke_used_starters') || '[]'); }
   catch { return []; }

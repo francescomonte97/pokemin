@@ -4696,7 +4696,7 @@ async function openHallOfFameModal() {
     try { await loadStaticPokedex(); } catch {}
   }
 
-  const rawEntries = getHallOfFame();
+  const rawEntries = typeof getPlayableHallOfFame === 'function' ? getPlayableHallOfFame() : getHallOfFame();
   const entries = Array.isArray(rawEntries) ? rawEntries : [];
 
   const modal = document.createElement('div');

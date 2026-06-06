@@ -354,6 +354,7 @@ async function _ensureCloudHallOfFameEntry(uuid) {
       gen2Mode: false,
       stageNumber: null,
       starterSpeciesId: null,
+      seedKind: 'pecharunt_unlock_placeholder',
       team: [{ speciesId: 1025, nickname: '', level: 50 }],
     });
 

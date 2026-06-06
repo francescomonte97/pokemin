@@ -129,7 +129,7 @@ async function initGame() {
 
   const endlessBtn = document.getElementById('btn-endless-run');
   if (endlessBtn) {
-    if (getHallOfFame().length > 0) {
+    if (typeof hasPlayableHallOfFame === 'function' && hasPlayableHallOfFame()) {
       preloadStageRegionBackgrounds();
       endlessBtn.onmouseenter = () => preloadStageRegionBackgrounds();
       endlessBtn.onclick = () => {
@@ -480,7 +480,7 @@ async function showStarterSelect() {
 
   if (state.isEndlessMode) {
     // --- Section 1: Region starters — only shown when no HoF runs exist yet ---
-    const allHofEntries = getHallOfFame();
+    const allHofEntries = typeof getPlayableHallOfFame === 'function' ? getPlayableHallOfFame() : getHallOfFame();
     if (allHofEntries.length === 0) {
       const starterIds = REGION_STARTERS[endlessState.stageNumber] || REGION_STARTERS[1];
       const starterSpecies = (await Promise.all(starterIds.map(id => fetchPokemonById(id)))).filter(Boolean);
@@ -2798,6 +2798,7 @@ function shareRun() {
 // ── Endless Mode ─────────────────────────────────────────────────────────────
 
 function getUnlockedStageCount() {
+  if (typeof hasPlayableHallOfFame === 'function' && !hasPlayableHallOfFame()) return 1;
   return Math.max(1, (getHofIndex().maxEndlessStage || 0) + 1);
 }
 
@@ -3391,6 +3392,7 @@ function getEvoLineRoot(speciesId) {
 // Does the player's Hall of Fame contain any Pokémon from this evolution line?
 // Reads the persistent index so unlocks survive HoF entry pruning.
 function hofHasEvoLine(speciesId) {
+  if (typeof hasPlayableHallOfFame === 'function' && !hasPlayableHallOfFame()) return false;
   const root = getEvoLineRoot(speciesId);
   return getHofIndex().evoLineRoots.includes(root);
 }
