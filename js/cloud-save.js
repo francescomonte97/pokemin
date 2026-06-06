@@ -914,7 +914,6 @@ function _showAccountModal() {
     localStorage.removeItem('poke_username_1');
     localStorage.removeItem('poke_uuid_1');
     localStorage.removeItem('poke_cloud_provider');
-    localStorage.removeItem('poke_fallback_access_key');
     localStorage.removeItem('poke_last_cloud_sync');
     modal.remove();
     _updateSyncUI();
