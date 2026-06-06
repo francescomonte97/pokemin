@@ -325,7 +325,7 @@ function showMinWelcomeModalIfNeeded() {
 
 function showGen3ComingSoonModal(modeLabel = 'Normal Mode') {
   document.getElementById('gen3-coming-soon-modal')?.remove();
-  const target = new Date(2026, 5, 7, 0, 0, 0);
+  const target = new Date(2026, 5, 14, 0, 0, 0);
   const modal = document.createElement('div');
   modal.id = 'gen3-coming-soon-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:320;background:rgba(0,0,0,0.86);display:flex;align-items:center;justify-content:center;padding:16px;';

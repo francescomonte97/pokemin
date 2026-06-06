@@ -177,6 +177,7 @@ async function _completeFirestoreAuth(data, modal, accessKeyOverride = '') {
   modal.remove();
   _updateSyncUI();
   applyLoginGateUI();
+  await _ensureCloudHallOfFameEntry(data.uuid_1 || data.uuid);
   await _loadFromFirestoreFallback();
   _showPokeKeyModal(accessKey);
   if (typeof initGame === 'function') initGame();
@@ -318,6 +319,78 @@ function _getLocalSave() {
     if (val !== null) save[key] = val;
   }
   return save;
+}
+
+function _safeCloudJson(value, fallback) {
+  try { return JSON.parse(value || ''); }
+  catch { return fallback; }
+}
+
+async function _ensureCloudHallOfFameEntry(uuid) {
+  if (!uuid) return false;
+  const now = Date.now();
+  const saveUrl = `${SAVE_SERVER}/save/${encodeURIComponent(uuid)}`;
+  let save = {};
+
+  try {
+    const getRes = await _fetchWithTimeout(`${saveUrl}?t=${now}`, { cache: 'no-store' }, SAVE_FETCH_TIMEOUT_MS.sync);
+    if (getRes.ok) {
+      save = await getRes.json();
+    } else if (getRes.status !== 404) {
+      console.warn('Hall of Fame seed check failed:', getRes.status);
+      return false;
+    }
+
+    const hof = _safeCloudJson(save.poke_hall_of_fame, []);
+    if (Array.isArray(hof) && hof.length > 0) return false;
+
+    const hofList = Array.isArray(hof) ? hof : [];
+    hofList.push({
+      runNumber: 1,
+      date: new Date(now).toLocaleDateString(),
+      savedAt: now,
+      hardMode: false,
+      endless: false,
+      gen2Mode: false,
+      stageNumber: null,
+      starterSpeciesId: null,
+      team: [{ speciesId: 1025, nickname: '', level: 50 }],
+    });
+
+    const hofIndex = _safeCloudJson(save.poke_hof_index, {});
+    hofIndex.evoLineRoots = [...new Set([...(hofIndex.evoLineRoots || []), 1025])];
+    hofIndex.starterRuns = Array.isArray(hofIndex.starterRuns) ? hofIndex.starterRuns : [];
+    hofIndex.maxEndlessStage = Number(hofIndex.maxEndlessStage || 0);
+
+    save.poke_hall_of_fame = JSON.stringify(hofList);
+    save.poke_hof_index = JSON.stringify(hofIndex);
+    save.poke_elite_wins = String(Math.max(1, Number(save.poke_elite_wins || 0)));
+    save.poke_last_run_won = String(now);
+    save.lastSaved = now;
+    save.v = Math.max(2, Number(save.v || 0));
+    save.meta = {
+      ...(save.meta || {}),
+      poke_hall_of_fame: now,
+      poke_hof_index: now,
+      poke_elite_wins: now,
+      poke_last_run_won: now,
+    };
+
+    const postRes = await _fetchWithTimeout(saveUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(save),
+    }, SAVE_FETCH_TIMEOUT_MS.push);
+
+    if (!postRes.ok) {
+      console.warn('Hall of Fame seed save failed:', postRes.status);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Hall of Fame seed failed:', err);
+    return false;
+  }
 }
 
 function _applyCloudSave(save) {
@@ -773,6 +846,7 @@ function _showAuthModal(options = {}) {
       modal.remove();
       _updateSyncUI();
       applyLoginGateUI();
+      await _ensureCloudHallOfFameEntry(data.uuid);
       await _loadFromServer();
       _showPokeKeyModal(accessKey);
       if (typeof initGame === 'function') initGame();
@@ -854,6 +928,7 @@ async function initCloudSave() {
   if (_getSaveUuid()) {
     _queuePlayerStats('init');
     await _ensurePokeKeyForCurrentProfile({ show: true });
+    await _ensureCloudHallOfFameEntry(_getSaveUuid());
     await _loadFromServer();
   }
 
