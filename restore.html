@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POKEMIN Save Recovery</title>
+  <meta name="theme-color" content="#0d2635">
+  <link rel="icon" href="ui/icons/app-icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071017;
+      --panel: #0d1c27;
+      --panel-2: #102b3b;
+      --border: #2e6eb5;
+      --accent: #72d6ff;
+      --gold: #ffd84a;
+      --text: #f2f2ea;
+      --dim: #a7bcc8;
+      --danger: #ff7777;
+      --success: #78df9a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background:
+        linear-gradient(rgba(7, 16, 23, 0.88), rgba(7, 16, 23, 0.94)),
+        url("ui/background.jpg") center / cover fixed;
+      color: var(--text);
+      font-family: monospace;
+    }
+
+    .recovery-shell {
+      width: min(100%, 460px);
+      border: 3px solid var(--border);
+      background: var(--panel);
+      box-shadow: 0 0 0 2px #000, 6px 6px 0 rgba(0, 0, 0, 0.75);
+    }
+
+    .recovery-header {
+      padding: 18px;
+      border-bottom: 3px solid #0f3a6a;
+      background: var(--panel-2);
+      text-align: center;
+    }
+
+    .recovery-title {
+      margin: 0;
+      color: var(--gold);
+      font-family: "Press Start 2P", monospace;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .recovery-subtitle {
+      margin: 8px 0 0;
+      color: var(--accent);
+      font-family: "Press Start 2P", monospace;
+      font-size: 7px;
+      line-height: 1.7;
+    }
+
+    .recovery-body {
+      display: grid;
+      gap: 13px;
+      padding: 20px;
+    }
+
+    .recovery-copy {
+      margin: 0 0 2px;
+      color: var(--dim);
+      font-size: 11px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--accent);
+      font-family: "Press Start 2P", monospace;
+      font-size: 7px;
+    }
+
+    input {
+      width: 100%;
+      border: 2px solid #254a64;
+      border-radius: 0;
+      outline: none;
+      background: #061019;
+      color: var(--text);
+      padding: 11px;
+      font: 13px monospace;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    button, .back-link {
+      min-height: 42px;
+      border: 2px solid var(--border);
+      background: #102b3b;
+      color: var(--text);
+      padding: 10px 12px;
+      font-family: "Press Start 2P", monospace;
+      font-size: 8px;
+      line-height: 1.5;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    button:hover, .back-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
+
+    .back-link {
+      display: block;
+      color: var(--dim);
+      text-decoration: none;
+    }
+
+    .recovery-status {
+      display: none;
+      border: 1px solid #254a64;
+      background: #061019;
+      padding: 11px;
+      font-size: 11px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    .recovery-status.visible { display: block; }
+    .recovery-status.error { border-color: var(--danger); color: var(--danger); }
+    .recovery-status.success { border-color: var(--success); color: var(--success); }
+
+    .recovery-result {
+      display: none;
+      gap: 8px;
+      border-top: 1px solid #254a64;
+      padding-top: 13px;
+    }
+
+    .recovery-result.visible { display: grid; }
+
+    .result-row {
+      display: grid;
+      grid-template-columns: 90px minmax(0, 1fr);
+      gap: 8px;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .result-label { color: var(--dim); }
+    .result-value { color: var(--text); overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <main class="recovery-shell">
+    <header class="recovery-header">
+      <h1 class="recovery-title">SAVE RECOVERY</h1>
+      <p class="recovery-subtitle">POKEMIN CLOUD SAVE</p>
+    </header>
+
+    <form id="recovery-form" class="recovery-body">
+      <p class="recovery-copy">
+        Log in with your Pokelike account. You may use your normal password or your Poke_key.
+      </p>
+
+      <label>
+        Username
+        <input id="recovery-username" name="username" autocomplete="username" maxlength="24" required>
+      </label>
+
+      <label>
+        Password / Poke_key
+        <input id="recovery-password" name="password" type="password" autocomplete="current-password" required>
+      </label>
+
+      <button id="recovery-submit" type="submit">Request save recovery</button>
+      <div id="recovery-status" class="recovery-status" role="status" aria-live="polite"></div>
+
+      <section id="recovery-result" class="recovery-result" aria-live="polite">
+        <div class="result-row">
+          <span class="result-label">Username</span>
+          <span id="result-username" class="result-value"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Status</span>
+          <span class="result-value">Recovery request received</span>
+        </div>
+      </section>
+
+      <a class="back-link" href="index.html">Back to game</a>
+    </form>
+  </main>
+
+  <script type="module" src="js/save-recovery.js"></script>
+</body>
+</html>

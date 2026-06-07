@@ -1,8 +1,9 @@
-const POKEMIN_CACHE = 'pokemin-pwa-v11';
+const POKEMIN_CACHE = 'pokemin-pwa-v12';
 
 const APP_SHELL = [
   './',
   './index.html',
+  './restore.html',
   './manifest.webmanifest',
   './css/style.css',
   './css/css2.css',
@@ -15,6 +16,7 @@ const APP_SHELL = [
   './js/cloud-save.js',
   './js/firebase-player-registry.js',
   './js/pwa.js',
+  './js/save-recovery.js',
   './js/game.js',
   './data/pokedex.json',
   './ui/background.jpg',
