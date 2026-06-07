@@ -1,4 +1,4 @@
-const POKEMIN_CACHE = 'pokemin-pwa-v12';
+const POKEMIN_CACHE = 'pokemin-pwa-v13';
 
 const APP_SHELL = [
   './',
@@ -56,6 +56,25 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  const isRecoveryResource =
+    url.pathname.endsWith('/restore.html') ||
+    url.pathname.endsWith('/restore') ||
+    url.pathname.endsWith('/restore/') ||
+    url.pathname.endsWith('/js/save-recovery.js');
+
+  if (isRecoveryResource) {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' })
+        .then(response => {
+          const copy = response.clone();
+          caches.open(POKEMIN_CACHE).then(cache => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
 
   if (url.pathname.endsWith('/data/pokedex.json')) {
     event.respondWith(
