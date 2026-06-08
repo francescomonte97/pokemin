@@ -1,4 +1,4 @@
-const POKEMIN_CACHE = 'pokemin-pwa-v14';
+const POKEMIN_CACHE = 'pokemin-pwa-v15';
 
 const APP_SHELL = [
   './',
@@ -57,13 +57,15 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  const isRecoveryResource =
+  const isNetworkFirstResource =
     url.pathname.endsWith('/restore.html') ||
     url.pathname.endsWith('/restore') ||
     url.pathname.endsWith('/restore/') ||
-    url.pathname.endsWith('/js/save-recovery.js');
+    url.pathname.endsWith('/js/save-recovery.js') ||
+    url.pathname.endsWith('/js/firebase-player-registry.js') ||
+    url.pathname.endsWith('/js/pwa.js');
 
-  if (isRecoveryResource) {
+  if (isNetworkFirstResource) {
     event.respondWith(
       fetch(request, { cache: 'no-store' })
         .then(response => {
