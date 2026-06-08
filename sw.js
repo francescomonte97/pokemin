@@ -1,4 +1,4 @@
-const POKEMIN_CACHE = 'pokemin-pwa-v16';
+const POKEMIN_CACHE = 'pokemin-pwa-v17';
 
 const APP_SHELL = [
   './',
@@ -63,6 +63,7 @@ self.addEventListener('fetch', event => {
     url.pathname.endsWith('/restore/') ||
     url.pathname.endsWith('/js/save-recovery.js') ||
     url.pathname.endsWith('/js/firebase-player-registry.js') ||
+    url.pathname.endsWith('/js/cloud-save.js') ||
     url.pathname.endsWith('/js/pwa.js');
 
   if (isNetworkFirstResource) {

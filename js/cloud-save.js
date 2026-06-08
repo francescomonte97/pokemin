@@ -1,4 +1,5 @@
 const SAVE_SERVER = 'https://save.pokelike.xyz';
+const RECOVERY_WORKER = 'https://pokemin-save-recovery.montefortefrancesco50.workers.dev';
 const SAVE_SCHEMA_VERSION = 2;
 
 // Per-call-site timeouts (ms). Without these, a stalled or DDoSed server
@@ -81,6 +82,18 @@ function _setFallbackAccessKey(accessKey) {
 
 function _getFallbackAccessKey() {
   return localStorage.getItem('poke_fallback_access_key') || '';
+}
+
+async function _redeemRecoveryCode(username, code) {
+  if (!/^PKR(?:-[A-Z0-9]{4}){4}$/i.test(String(code || '').trim())) return null;
+  const response = await _fetchWithTimeout(`${RECOVERY_WORKER}/redeem`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, code }),
+  }, SAVE_FETCH_TIMEOUT_MS.auth);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Invalid or expired recovery code.');
+  return data;
 }
 
 function _pokeKeyShownKey(accessKey) {
@@ -179,6 +192,34 @@ async function _completeFirestoreAuth(data, modal, accessKeyOverride = '') {
   applyLoginGateUI();
   await _ensureCloudHallOfFameEntry(data.uuid_1 || data.uuid);
   await _loadFromFirestoreFallback();
+  _showPokeKeyModal(accessKey);
+  if (typeof initGame === 'function') initGame();
+}
+
+async function _completeRecoveryAuth(data, modal) {
+  const uuid = data.uuid;
+  const username = data.username;
+  localStorage.setItem('poke_save_uuid', uuid);
+  localStorage.setItem('poke_username', username);
+  localStorage.setItem('poke_username_1', username);
+  localStorage.removeItem('poke_uuid_1');
+  localStorage.removeItem('poke_cloud_provider');
+  localStorage.removeItem('poke_fallback_access_key');
+
+  let accessKey = '';
+  try {
+    const fallbackAccount = await _provisionFirestoreAccess(username, uuid);
+    accessKey = fallbackAccount?.accessKey || '';
+  } catch (error) {
+    console.warn('Poke_key refresh after recovery failed:', error);
+  }
+
+  _setCloudStatus('online');
+  _queuePlayerStats('recovery_auth', { force: true });
+  modal.remove();
+  _updateSyncUI();
+  applyLoginGateUI();
+  await _loadFromServer();
   _showPokeKeyModal(accessKey);
   if (typeof initGame === 'function') initGame();
 }
@@ -777,10 +818,10 @@ function _showAuthModal(options = {}) {
     <div style="background:var(--bg2);border:2px solid var(--border);padding:24px;max-width:360px;width:90%;font-family:monospace;display:flex;flex-direction:column;gap:10px;">
       <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);">☁ CLOUD SAVE</div>
       ${required ? '<div style="font-size:10px;color:#ffd84a;line-height:1.5;">Log in or register to play and access your saved progress.</div>' : ''}
-      <div style="font-size:9px;color:var(--text-dim);line-height:1.45;">Puoi usare la tua Poke_key nel campo password per accedere ai tuoi dati.</div>
+      <div style="font-size:9px;color:var(--text-dim);line-height:1.45;">Puoi usare la tua Poke_key o un codice di recupero nel campo password.</div>
       <input id="auth-username" placeholder="Username" autocomplete="username"
         style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px;font-size:12px;font-family:monospace;">
-      <input id="auth-password" type="password" placeholder="Password / Poke_key" autocomplete="current-password"
+      <input id="auth-password" type="password" placeholder="Password / Poke_key / Recovery code" autocomplete="current-password"
         style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px;font-size:12px;font-family:monospace;">
       <div id="auth-error" style="color:#e05050;font-size:9px;display:none;"></div>
       <div style="display:flex;gap:8px;">
@@ -820,6 +861,21 @@ function _showAuthModal(options = {}) {
             console.warn('Poke_key login failed:', fallbackErr);
           }
         }
+        if (endpoint === '/login') {
+          try {
+            const recoveryData = await _redeemRecoveryCode(username, password);
+            if (recoveryData) {
+              await _completeRecoveryAuth(recoveryData, modal);
+              return;
+            }
+          } catch (recoveryErr) {
+            console.warn('Recovery code login failed:', recoveryErr);
+            showErr(recoveryErr.message || 'Invalid or expired recovery code.');
+            btn.disabled = false;
+            btn.textContent = 'Log In';
+            return;
+          }
+        }
         showErr(data.error || 'Something went wrong.'); btn.disabled = false; btn.textContent = endpoint === '/login' ? 'Log In' : 'Register'; return;
       }
       const previousUuid = _getSaveUuid();
@@ -857,6 +913,21 @@ function _showAuthModal(options = {}) {
       const fallback = _getFirestoreFallback();
       const action = endpoint === '/login' ? 'login' : 'register';
       if (!fallback?.[action]) {
+        if (endpoint === '/login') {
+          try {
+            const recoveryData = await _redeemRecoveryCode(username, password);
+            if (recoveryData) {
+              await _completeRecoveryAuth(recoveryData, modal);
+              return;
+            }
+          } catch (recoveryErr) {
+            console.warn('Recovery code login failed:', recoveryErr);
+            showErr(recoveryErr.message || 'Accesso non riuscito.');
+            btn.disabled = false;
+            btn.textContent = 'Log In';
+            return;
+          }
+        }
         showErr('Accesso non riuscito. Puoi provare con la tua Poke_key.');
         btn.disabled = false;
         btn.textContent = endpoint === '/login' ? 'Log In' : 'Register';
@@ -867,6 +938,21 @@ function _showAuthModal(options = {}) {
         await _completeFirestoreAuth(data, modal, action === 'login' ? password : '');
       } catch (fallbackErr) {
         console.warn('Firestore auth fallback failed:', fallbackErr);
+        if (endpoint === '/login') {
+          try {
+            const recoveryData = await _redeemRecoveryCode(username, password);
+            if (recoveryData) {
+              await _completeRecoveryAuth(recoveryData, modal);
+              return;
+            }
+          } catch (recoveryErr) {
+            console.warn('Recovery code login failed:', recoveryErr);
+            showErr(recoveryErr.message || 'Accesso non riuscito.');
+            btn.disabled = false;
+            btn.textContent = 'Log In';
+            return;
+          }
+        }
         showErr(fallbackErr.message || 'Accesso non riuscito.');
         btn.disabled = false;
         btn.textContent = endpoint === '/login' ? 'Log In' : 'Register';

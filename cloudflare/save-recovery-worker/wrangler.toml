@@ -1,0 +1,10 @@
+name = "pokemin-save-recovery"
+main = "src/index.js"
+compatibility_date = "2026-06-08"
+workers_dev = true
+preview_urls = false
+
+[vars]
+FIREBASE_PROJECT_ID = "chat-personalizzata"
+ALLOWED_ORIGIN = "https://www.pokemin.it"
+TOKEN_TTL_MINUTES = "30"

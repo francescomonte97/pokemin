@@ -1,9 +1,9 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
-import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import { doc, getDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 
 const SAVE_SERVER = 'https://save.pokelike.xyz';
-const RESTORE_REQUESTS_COLLECTION = 'save_restore_requests';
+const RECOVERY_WORKER = 'https://pokemin-save-recovery.montefortefrancesco50.workers.dev';
 const ACCOUNTS_COLLECTION = 'player_accounts';
 
 const firebaseConfig = {
@@ -128,17 +128,18 @@ async function authenticate(username, password) {
 }
 
 async function createRestoreRequest(account) {
-  await ensureFirebaseAuth();
-  await setDoc(doc(db, RESTORE_REQUESTS_COLLECTION, account.uuid), {
-    uuid: account.uuid,
-    username: account.username,
-    usernameKey: normalizeUsername(account.username),
-    loginProvider: account.provider,
-    requestStatus: 'pending',
-    source: 'pokemin_save_recovery',
-    requestedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+  const response = await fetch(`${RECOVERY_WORKER}/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      uuid: account.uuid,
+      username: account.username,
+      loginProvider: account.provider,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Unable to create the recovery request.');
+  return data;
 }
 
 form.addEventListener('submit', async event => {
