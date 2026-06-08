@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import { getAnalytics, isSupported as isAnalyticsSupported } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -13,6 +14,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
 const PLAYER_STATS_COLLECTION = 'player_stats';
 const FALLBACK_ACCOUNTS_COLLECTION = 'player_accounts';
@@ -26,10 +28,24 @@ const VISITOR_ID_KEY = 'poke_visitor_id';
 let activeStartedAt = Date.now();
 let statsWriteInFlight = false;
 let visitorIdPromise = null;
+let firebaseAuthPromise = null;
 
 isAnalyticsSupported()
   .then(supported => { if (supported) getAnalytics(app); })
   .catch(err => console.warn('Firebase analytics unavailable:', err));
+
+async function ensureFirebaseAuth() {
+  if (auth.currentUser) return auth.currentUser;
+  if (!firebaseAuthPromise) {
+    firebaseAuthPromise = signInAnonymously(auth)
+      .then(result => result.user)
+      .catch(error => {
+        firebaseAuthPromise = null;
+        throw error;
+      });
+  }
+  return firebaseAuthPromise;
+}
 
 function sanitizeUuid(uuid) {
   const value = String(uuid || '').trim();
@@ -139,6 +155,7 @@ function safeFallbackUsername(username) {
 }
 
 async function provisionFallbackAccount(usernameValue, uuidValue, options = {}) {
+  await ensureFirebaseAuth();
   const { username, key } = safeFallbackUsername(usernameValue);
   const safeUuid = sanitizeUuid(uuidValue);
   if (!safeUuid) throw new Error('invalid uuid');
@@ -183,6 +200,7 @@ async function registerFallbackAccount(usernameValue) {
 }
 
 async function loginFallbackAccount(usernameValue, accessKey) {
+  await ensureFirebaseAuth();
   const { key } = safeFallbackUsername(usernameValue);
   const snap = await getDoc(doc(db, FALLBACK_ACCOUNTS_COLLECTION, key));
   if (!snap.exists()) throw new Error('invalid credentials');
@@ -195,6 +213,7 @@ async function loginFallbackAccount(usernameValue, accessKey) {
 }
 
 async function loadFallbackSave(uuid) {
+  await ensureFirebaseAuth();
   const safeUuid = sanitizeUuid(uuid);
   if (!safeUuid) return null;
   const snap = await getDoc(doc(db, FALLBACK_SAVES_COLLECTION, safeUuid));
@@ -203,6 +222,7 @@ async function loadFallbackSave(uuid) {
 }
 
 async function saveFallbackSave(uuid, save) {
+  await ensureFirebaseAuth();
   const safeUuid = sanitizeUuid(uuid);
   if (!safeUuid || !save || typeof save !== 'object') return;
   await setDoc(doc(db, FALLBACK_SAVES_COLLECTION, safeUuid), {
@@ -311,6 +331,7 @@ async function writePlayerStats(uuid, { force = false, reason = 'sync' } = {}) {
 
   statsWriteInFlight = true;
   try {
+    await ensureFirebaseAuth();
     await setDoc(doc(db, PLAYER_STATS_COLLECTION, getPlayerStatsDocId(safeUuid)), {
       ...buildPlayerStatsPayload(safeUuid),
       lastWriteReason: reason,

@@ -1,4 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 
 const SAVE_SERVER = 'https://save.pokelike.xyz';
@@ -16,7 +17,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
+let firebaseAuthPromise = null;
 
 const form = document.getElementById('recovery-form');
 const submitButton = document.getElementById('recovery-submit');
@@ -26,6 +29,19 @@ const resultElement = document.getElementById('recovery-result');
 function showStatus(message, type = '') {
   statusElement.textContent = message;
   statusElement.className = `recovery-status visible${type ? ` ${type}` : ''}`;
+}
+
+async function ensureFirebaseAuth() {
+  if (auth.currentUser) return auth.currentUser;
+  if (!firebaseAuthPromise) {
+    firebaseAuthPromise = signInAnonymously(auth)
+      .then(result => result.user)
+      .catch(error => {
+        firebaseAuthPromise = null;
+        throw error;
+      });
+  }
+  return firebaseAuthPromise;
 }
 
 function sanitizeUuid(value) {
@@ -67,6 +83,7 @@ async function hashAccessKey(accessKey, saltBase64) {
 }
 
 async function loginWithPokeKey(username, pokeKey) {
+  await ensureFirebaseAuth();
   const usernameKey = normalizeUsername(username);
   if (!usernameKey) throw new Error('Invalid username.');
 
@@ -111,6 +128,7 @@ async function authenticate(username, password) {
 }
 
 async function createRestoreRequest(account) {
+  await ensureFirebaseAuth();
   await setDoc(doc(db, RESTORE_REQUESTS_COLLECTION, account.uuid), {
     uuid: account.uuid,
     username: account.username,
