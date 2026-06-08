@@ -39,8 +39,8 @@ export default {
         return approveRecoveryRequest(request, env, cors);
       }
 
-      if (request.method === 'POST' && url.pathname === '/redeem') {
-        return redeemRecoveryToken(request, env, cors);
+      if (request.method === 'POST' && url.pathname === '/reset-password') {
+        return resetRecoveryPassword(request, env, cors);
       }
 
       return json({ error: 'Not found.' }, 404, cors);
@@ -140,11 +140,14 @@ async function approveRecoveryRequest(request, env, cors) {
   }, 200, cors);
 }
 
-async function redeemRecoveryToken(request, env, cors) {
+async function resetRecoveryPassword(request, env, cors) {
   const body = await readJson(request);
   const usernameKey = normalizeUsername(body.username);
+  const password = String(body.newPassword || '');
   const code = normalizeCode(body.code);
-  if (!usernameKey || !code) return json({ error: 'Invalid username or recovery code.' }, 400, cors);
+  if (!usernameKey || !code || password.length < 10 || password.length > 128) {
+    return json({ error: 'Invalid recovery details.' }, 400, cors);
+  }
 
   const tokenDocument = await getDocumentWithMetadata(env, TOKENS_COLLECTION, usernameKey);
   if (!tokenDocument) return json({ error: 'Invalid or expired recovery code.' }, 401, cors);
@@ -161,25 +164,38 @@ async function redeemRecoveryToken(request, env, cors) {
     return json({ error: 'Invalid or expired recovery code.' }, 401, cors);
   }
 
+  const accountDocument = await getDocumentWithMetadata(env, ACCOUNTS_COLLECTION, usernameKey);
+  if (!accountDocument) return json({ error: 'Recovery account unavailable.' }, 409, cors);
+
+  const verifier = await createPasswordVerifier(password);
   const now = new Date();
-  await patchDocument(env, TOKENS_COLLECTION, usernameKey, {
-    status: 'used',
-    usedAt: now,
-  }, tokenDocument.updateTime);
+  const writes = [
+    updateWrite(env, TOKENS_COLLECTION, usernameKey, {
+      status: 'used',
+      usedAt: now,
+    }, tokenDocument.updateTime),
+    updateWrite(env, ACCOUNTS_COLLECTION, usernameKey, {
+      accessKeySalt: verifier.salt,
+      accessKeyHash: verifier.hash,
+      poke_key: null,
+      authProvider: 'cloud_recovery_password',
+      updatedAt: now,
+    }, accountDocument.updateTime),
+  ];
 
   if (token.requestId) {
-    await patchDocument(env, REQUESTS_COLLECTION, token.requestId, {
+    writes.push(updateWrite(env, REQUESTS_COLLECTION, token.requestId, {
       status: 'completed',
       completedAt: now,
       updatedAt: now,
-    });
+    }));
   }
 
+  await commitWrites(env, writes);
   return json({
     ok: true,
     username: token.username,
-    uuid: token.uuid,
-    provider: 'recovery_code',
+    message: 'Cloud password updated.',
   }, 200, cors);
 }
 
@@ -224,6 +240,27 @@ function cleanText(value, maxLength) {
 
 function normalizeCode(value) {
   return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+async function createPasswordVerifier(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits({
+    name: 'PBKDF2',
+    salt,
+    iterations: 120000,
+    hash: 'SHA-256',
+  }, key, 256);
+  return {
+    salt: bytesToBase64(salt),
+    hash: bytesToBase64(new Uint8Array(bits)),
+  };
 }
 
 async function readJson(request) {
@@ -303,9 +340,42 @@ async function patchDocument(env, collection, id, data, updateTime = '') {
   if (!response.ok) throw new Error(`Firestore update failed: ${response.status}`);
 }
 
+function updateWrite(env, collection, id, data, updateTime = '') {
+  const fields = encodeFields(data);
+  const write = {
+    update: {
+      name: documentName(env, collection, id),
+      fields,
+    },
+    updateMask: {
+      fieldPaths: Object.keys(fields),
+    },
+  };
+  if (updateTime) write.currentDocument = { updateTime };
+  return write;
+}
+
+async function commitWrites(env, writes) {
+  const response = await firestoreFetch(
+    env,
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}` +
+      '/databases/(default)/documents:commit',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes }),
+    }
+  );
+  if (!response.ok) throw new Error(`Firestore commit failed: ${response.status}`);
+}
+
 function documentUrl(env, collection, id) {
-  return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}` +
-    `/databases/(default)/documents/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`;
+  return `https://firestore.googleapis.com/v1/${documentName(env, collection, id)}`;
+}
+
+function documentName(env, collection, id) {
+  return `projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/` +
+    `${collection}/${id}`;
 }
 
 async function firestoreFetch(env, url, options = {}) {
@@ -374,6 +444,12 @@ function base64UrlBytes(bytes) {
   let binary = '';
   bytes.forEach(byte => { binary += String.fromCharCode(byte); });
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
 }
 
 function encodeFields(data) {

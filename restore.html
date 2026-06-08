@@ -83,6 +83,12 @@
       text-align: center;
     }
 
+    .section-divider {
+      border: 0;
+      border-top: 1px solid #254a64;
+      margin: 5px 0;
+    }
+
     label {
       display: grid;
       gap: 6px;
@@ -198,7 +204,36 @@
           <span class="result-value">Recovery request received</span>
         </div>
       </section>
+    </form>
 
+    <form id="reset-form" class="recovery-body">
+      <hr class="section-divider">
+      <p class="recovery-copy">
+        Already received a recovery code? Choose a new cloud password for your account.
+      </p>
+
+      <label>
+        Username
+        <input id="reset-username" name="username" autocomplete="username" maxlength="24" required>
+      </label>
+
+      <label>
+        Recovery code
+        <input id="reset-code" name="code" autocomplete="one-time-code" maxlength="24" required>
+      </label>
+
+      <label>
+        New password
+        <input id="reset-password" name="new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+      </label>
+
+      <label>
+        Confirm password
+        <input id="reset-password-confirm" name="confirm-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+      </label>
+
+      <button id="reset-submit" type="submit">Set new cloud password</button>
+      <div id="reset-status" class="recovery-status" role="status" aria-live="polite"></div>
       <a class="back-link" href="index.html">Back to game</a>
     </form>
   </main>

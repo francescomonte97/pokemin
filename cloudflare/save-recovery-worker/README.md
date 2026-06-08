@@ -78,6 +78,11 @@ The response contains the one-time `recoveryCode`. Send only that code to the
 verified account owner. It expires after 30 minutes and becomes invalid after
 its first successful use.
 
+The user enters that code, their username, and a new password on
+`restore.html`. The Worker stores only a PBKDF2-SHA256 verifier and consumes
+the recovery code atomically. The new password is a POKEMIN cloud password;
+it does not change the legacy Pokelike server password.
+
 ## Firestore rules
 
 The Worker uses its service account and does not require client access to the
