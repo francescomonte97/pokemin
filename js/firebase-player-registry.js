@@ -3,13 +3,13 @@ import { getAnalytics, isSupported as isAnalyticsSupported } from 'https://www.g
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyBAbtomUhRnJOKdEkFZPdHo-3o4OYF8Aik',
-  authDomain: 'hotlist-insights.firebaseapp.com',
-  projectId: 'hotlist-insights',
-  storageBucket: 'hotlist-insights.firebasestorage.app',
-  messagingSenderId: '542456803768',
-  appId: '1:542456803768:web:3b546e431cfe51ed76df4d',
-  measurementId: 'G-VT2Z0QSD19',
+  apiKey: 'AIzaSyDkfQWm-OXTYiVipovmWFSx_WkKTo_cChI',
+  authDomain: 'chat-personalizzata.firebaseapp.com',
+  projectId: 'chat-personalizzata',
+  storageBucket: 'chat-personalizzata.firebasestorage.app',
+  messagingSenderId: '255292011690',
+  appId: '1:255292011690:web:b97c4b5bb15fd14fc20cd3',
+  measurementId: 'G-SRPMCF9YPP',
 };
 
 const app = initializeApp(firebaseConfig);
