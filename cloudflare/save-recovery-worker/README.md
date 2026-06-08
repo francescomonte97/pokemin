@@ -47,6 +47,9 @@ The expected URL for the current client configuration is:
 https://pokemin-save-recovery.montefortefrancesco50.workers.dev
 ```
 
+CORS accepts the production origin configured in `ALLOWED_ORIGIN` and local
+development origins on `localhost`, `127.0.0.1`, or `[::1]`.
+
 Verify it:
 
 ```sh

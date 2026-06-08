@@ -235,8 +235,8 @@ async function readJson(request) {
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '';
   const allowedOrigin = env.ALLOWED_ORIGIN || '';
-  return {
-    'Access-Control-Allow-Origin': origin === allowedOrigin ? origin : allowedOrigin,
+  const isLocalDevelopment = /^https?:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(origin);
+  const headers = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
@@ -244,6 +244,10 @@ function corsHeaders(request, env) {
     'Content-Type': 'application/json; charset=utf-8',
     'Vary': 'Origin',
   };
+  if (origin === allowedOrigin || isLocalDevelopment) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+  return headers;
 }
 
 function json(data, status, headers) {
