@@ -1,5 +1,6 @@
 const REQUESTS_COLLECTION = 'save_restore_requests';
 const TOKENS_COLLECTION = 'save_restore_tokens';
+const ACCOUNTS_COLLECTION = 'player_accounts';
 const TOKEN_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 let cachedGoogleToken = null;
@@ -53,9 +54,18 @@ export default {
 async function createRecoveryRequest(request, env, cors) {
   const body = await readJson(request);
   const username = cleanUsername(body.username);
-  const uuid = cleanUuid(body.uuid);
-  const loginProvider = cleanText(body.loginProvider, 32) || 'pokelike';
-  if (!username || !uuid) return json({ error: 'Invalid recovery request.' }, 400, cors);
+  const usernameKey = normalizeUsername(username);
+  if (!username || !usernameKey) return json({ error: 'Invalid recovery request.' }, 400, cors);
+
+  const account = await getDocument(env, ACCOUNTS_COLLECTION, usernameKey);
+  const uuid = cleanUuid(account?.uuid_1 || account?.uuid);
+  if (!uuid) {
+    return json({
+      ok: true,
+      status: 'pending',
+      message: 'If the account exists, the recovery request will be reviewed.',
+    }, 202, cors);
+  }
 
   const requestId = crypto.randomUUID();
   const now = new Date();
@@ -65,17 +75,21 @@ async function createRecoveryRequest(request, env, cors) {
 
   await setDocument(env, REQUESTS_COLLECTION, requestId, {
     requestId,
-    username,
-    usernameKey: normalizeUsername(username),
+    username: account.username || username,
+    usernameKey,
     uuid,
-    loginProvider,
+    loginProvider: 'username_recovery',
     status: 'pending',
     visitorHash,
     requestedAt: now,
     updatedAt: now,
   });
 
-  return json({ ok: true, requestId, status: 'pending' }, 201, cors);
+  return json({
+    ok: true,
+    status: 'pending',
+    message: 'If the account exists, the recovery request will be reviewed.',
+  }, 202, cors);
 }
 
 async function approveRecoveryRequest(request, env, cors) {

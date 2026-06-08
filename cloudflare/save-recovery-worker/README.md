@@ -1,7 +1,9 @@
 # POKEMIN Save Recovery Worker
 
-This Worker creates manually approved, one-time recovery codes. Codes expire
-after 30 minutes and are stored in Firestore only as SHA-256 hashes.
+This Worker accepts recovery requests using only the account username. It
+resolves the UUID from `player_accounts` on the server, then creates manually
+approved, one-time recovery codes. Codes expire after 30 minutes and are
+stored in Firestore only as SHA-256 hashes.
 
 The public request alone is not proof of ownership. Before approving it,
 verify the account owner through your normal support channel.
