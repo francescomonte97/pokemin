@@ -1,6 +1,8 @@
 const REQUESTS_COLLECTION = 'save_restore_requests';
 const TOKENS_COLLECTION = 'save_restore_tokens';
 const ACCOUNTS_COLLECTION = 'player_accounts';
+const REGISTRATION_LIMITS_COLLECTION = 'registration_ip_limits';
+const SAVE_SERVER = 'https://save.pokelike.xyz';
 const TOKEN_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 let cachedGoogleToken = null;
@@ -33,6 +35,14 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/request') {
         return createRecoveryRequest(request, env, cors);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/register') {
+        return registerAccount(request, env, cors);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/admin/requests') {
+        return listRecoveryRequests(request, env, cors);
       }
 
       if (request.method === 'POST' && url.pathname === '/admin/approve') {
@@ -90,6 +100,98 @@ async function createRecoveryRequest(request, env, cors) {
     status: 'pending',
     message: 'If the account exists, the recovery request will be reviewed.',
   }, 202, cors);
+}
+
+async function registerAccount(request, env, cors) {
+  const body = await readJson(request);
+  const username = cleanUsername(body.username);
+  const password = String(body.password || '');
+  const clientIp = request.headers.get('CF-Connecting-IP') || '';
+  if (!username || password.length < 6 || password.length > 128) {
+    return json({ error: 'Invalid username or password.' }, 400, cors);
+  }
+  if (!clientIp || !env.REGISTRATION_HASH_SALT) {
+    return json({ error: 'Registration service unavailable.' }, 503, cors);
+  }
+
+  const ipHash = await hashText(`${clientIp}:${env.REGISTRATION_HASH_SALT}`);
+  const now = new Date();
+  const reserved = await createDocumentIfAbsent(
+    env,
+    REGISTRATION_LIMITS_COLLECTION,
+    ipHash,
+    {
+      status: 'pending',
+      usernameKey: normalizeUsername(username),
+      createdAt: now,
+      updatedAt: now,
+    }
+  );
+  if (!reserved) {
+    return json({ error: 'Only one account can be created from this connection.' }, 429, cors);
+  }
+
+  try {
+    const upstream = await fetch(`${SAVE_SERVER}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const responseText = await upstream.text();
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = upstream.ok
+        ? { ok: true }
+        : { error: 'Registration server returned an invalid response.' };
+    }
+
+    if (!upstream.ok) {
+      await releaseRegistrationReservation(env, ipHash);
+      return json(responseData, upstream.status, cors);
+    }
+
+    try {
+      await patchDocument(env, REGISTRATION_LIMITS_COLLECTION, ipHash, {
+        status: 'completed',
+        usernameKey: normalizeUsername(responseData.username || username),
+        uuid: cleanUuid(responseData.uuid),
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error('Registration completed but IP record update failed:', error);
+    }
+    return json(responseData, upstream.status, cors);
+  } catch (error) {
+    await releaseRegistrationReservation(env, ipHash);
+    console.error('Registration proxy failed:', error);
+    return json({ error: 'Registration server unavailable.' }, 502, cors);
+  }
+}
+
+async function releaseRegistrationReservation(env, ipHash) {
+  try {
+    await deleteDocument(env, REGISTRATION_LIMITS_COLLECTION, ipHash);
+  } catch (error) {
+    console.error('Registration reservation cleanup failed:', error);
+  }
+}
+
+async function listRecoveryRequests(request, env, cors) {
+  if (!isAdminRequest(request, env)) return json({ error: 'Unauthorized.' }, 401, cors);
+
+  const rows = await runPendingRecoveryQuery(env, 100);
+  const requests = rows
+    .sort((a, b) => dateValue(b.requestedAt) - dateValue(a.requestedAt))
+    .map(item => ({
+      requestId: cleanId(item.requestId),
+      username: cleanUsername(item.username),
+      status: 'pending',
+      requestedAt: toIsoString(item.requestedAt),
+    }));
+
+  return json({ ok: true, requests }, 200, cors);
 }
 
 async function approveRecoveryRequest(request, env, cors) {
@@ -322,6 +424,22 @@ async function setDocument(env, collection, id, data) {
   if (!response.ok) throw new Error(`Firestore write failed: ${response.status}`);
 }
 
+async function createDocumentIfAbsent(env, collection, id, data) {
+  const params = new URLSearchParams({ 'currentDocument.exists': 'false' });
+  const response = await firestoreFetch(
+    env,
+    `${documentUrl(env, collection, id)}?${params.toString()}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: encodeFields(data) }),
+    }
+  );
+  if (response.status === 409 || response.status === 412) return false;
+  if (!response.ok) throw new Error(`Firestore create failed: ${response.status}`);
+  return true;
+}
+
 async function patchDocument(env, collection, id, data, updateTime = '') {
   const fields = encodeFields(data);
   const params = new URLSearchParams();
@@ -338,6 +456,45 @@ async function patchDocument(env, collection, id, data, updateTime = '') {
     }
   );
   if (!response.ok) throw new Error(`Firestore update failed: ${response.status}`);
+}
+
+async function deleteDocument(env, collection, id) {
+  const response = await firestoreFetch(env, documentUrl(env, collection, id), {
+    method: 'DELETE',
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Firestore delete failed: ${response.status}`);
+  }
+}
+
+async function runPendingRecoveryQuery(env, limit) {
+  const response = await firestoreFetch(
+    env,
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}` +
+      '/databases/(default)/documents:runQuery',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: REQUESTS_COLLECTION }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'status' },
+              op: 'EQUAL',
+              value: { stringValue: 'pending' },
+            },
+          },
+          limit,
+        },
+      }),
+    }
+  );
+  if (!response.ok) throw new Error(`Firestore query failed: ${response.status}`);
+  const rows = await response.json();
+  return rows
+    .filter(row => row.document)
+    .map(row => decodeFields(row.document.fields || {}));
 }
 
 function updateWrite(env, collection, id, data, updateTime = '') {
@@ -450,6 +607,17 @@ function bytesToBase64(bytes) {
   let binary = '';
   bytes.forEach(byte => { binary += String.fromCharCode(byte); });
   return btoa(binary);
+}
+
+function dateValue(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const timestamp = date.getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function toIsoString(value) {
+  const timestamp = dateValue(value);
+  return timestamp ? new Date(timestamp).toISOString() : '';
 }
 
 function encodeFields(data) {

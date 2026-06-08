@@ -1,4 +1,5 @@
 const SAVE_SERVER = 'https://save.pokelike.xyz';
+const RECOVERY_WORKER = 'https://pokemin-save-recovery.montefortefrancesco50.workers.dev';
 const SAVE_SCHEMA_VERSION = 2;
 
 // Per-call-site timeouts (ms). Without these, a stalled or DDoSed server
@@ -802,7 +803,10 @@ function _showAuthModal(options = {}) {
     const btn = document.getElementById(endpoint === '/login' ? 'auth-login-btn' : 'auth-register-btn');
     btn.disabled = true; btn.textContent = '...';
     try {
-      const res = await _fetchWithTimeout(`${SAVE_SERVER}${endpoint}`, {
+      const authUrl = endpoint === '/register'
+        ? `${RECOVERY_WORKER}/register`
+        : `${SAVE_SERVER}${endpoint}`;
+      const res = await _fetchWithTimeout(authUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -854,6 +858,12 @@ function _showAuthModal(options = {}) {
     } catch (e) {
       _setCloudStatus('offline');
       _alertSavedPokeKeyForServerDown();
+      if (endpoint === '/register') {
+        showErr('Registration is temporarily unavailable.');
+        btn.disabled = false;
+        btn.textContent = 'Register';
+        return;
+      }
       const fallback = _getFirestoreFallback();
       const action = endpoint === '/login' ? 'login' : 'register';
       if (!fallback?.[action]) {

@@ -27,13 +27,14 @@ npx wrangler secret put FIREBASE_PRIVATE_KEY
 npx wrangler secret put ADMIN_API_KEY
 npx wrangler secret put TOKEN_HASH_SALT
 npx wrangler secret put REQUEST_HASH_SALT
+npx wrangler secret put REGISTRATION_HASH_SALT
 ```
 
 Never commit these values. `FIREBASE_PRIVATE_KEY` must contain the complete
 PEM private key from the service-account JSON.
 
 Generate long random values for `ADMIN_API_KEY`, `TOKEN_HASH_SALT`, and
-`REQUEST_HASH_SALT`. They must all be different.
+`REQUEST_HASH_SALT`, and `REGISTRATION_HASH_SALT`. They must all be different.
 
 ## Deploy
 
@@ -63,6 +64,11 @@ curl "https://pokemin-save-recovery.montefortefrancesco50.workers.dev/health?dee
 ```
 
 ## Approve a request
+
+Open `recovery-admin.html`, enter `ADMIN_API_KEY`, and approve a pending
+request. The key is retained only in the browser tab's `sessionStorage`.
+
+The equivalent API call is:
 
 Use the `requestId` displayed in the Firestore `save_restore_requests`
 collection:
@@ -96,4 +102,25 @@ match /save_restore_requests/{document} {
 match /save_restore_tokens/{document} {
   allow read, write: if false;
 }
+
+match /registration_ip_limits/{document} {
+  allow read, write: if false;
+}
 ```
+
+## Registration limit
+
+The game sends new registrations through this Worker. It stores only a
+salted SHA-256 hash of `CF-Connecting-IP`, never the raw address or password.
+After a successful registration, subsequent registration attempts from the
+same public IP receive HTTP 429.
+
+Set the registration salt before deploying:
+
+```sh
+npx wrangler secret put REGISTRATION_HASH_SALT
+```
+
+This protects registrations made through the POKEMIN client. The legacy
+`save.pokelike.xyz/register` endpoint must enforce its own limit if it remains
+publicly reachable.

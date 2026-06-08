@@ -1,9 +1,10 @@
-const POKEMIN_CACHE = 'pokemin-pwa-v19';
+const POKEMIN_CACHE = 'pokemin-pwa-v20';
 
 const APP_SHELL = [
   './',
   './index.html',
   './restore.html',
+  './recovery-admin.html',
   './manifest.webmanifest',
   './css/style.css',
   './css/css2.css',
@@ -17,6 +18,7 @@ const APP_SHELL = [
   './js/firebase-player-registry.js',
   './js/pwa.js',
   './js/save-recovery.js',
+  './js/recovery-admin.js',
   './js/game.js',
   './data/pokedex.json',
   './ui/background.jpg',
@@ -61,7 +63,11 @@ self.addEventListener('fetch', event => {
     url.pathname.endsWith('/restore.html') ||
     url.pathname.endsWith('/restore') ||
     url.pathname.endsWith('/restore/') ||
+    url.pathname.endsWith('/recovery-admin.html') ||
+    url.pathname.endsWith('/recovery-admin') ||
+    url.pathname.endsWith('/recovery-admin/') ||
     url.pathname.endsWith('/js/save-recovery.js') ||
+    url.pathname.endsWith('/js/recovery-admin.js') ||
     url.pathname.endsWith('/js/firebase-player-registry.js') ||
     url.pathname.endsWith('/js/cloud-save.js') ||
     url.pathname.endsWith('/js/pwa.js');

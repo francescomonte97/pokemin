@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>POKEMIN Recovery Admin</title>
+  <link rel="stylesheet" href="css/css2.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111318;
+      --panel: #1b1f27;
+      --panel-2: #242a34;
+      --border: #596579;
+      --text: #f4f6fa;
+      --muted: #aeb8c8;
+      --accent: #f2cf45;
+      --success: #65d68b;
+      --danger: #ff7777;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: monospace;
+    }
+    main {
+      width: min(920px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      padding-bottom: 18px;
+      border-bottom: 2px solid var(--border);
+    }
+    h1 {
+      margin: 0;
+      color: var(--accent);
+      font-family: "Press Start 2P", monospace;
+      font-size: clamp(15px, 3vw, 22px);
+      line-height: 1.5;
+    }
+    header p, .empty, .status {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .auth {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 10px;
+      margin: 22px 0;
+    }
+    input, button {
+      min-height: 42px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font: inherit;
+    }
+    input {
+      min-width: 0;
+      padding: 10px 12px;
+      background: var(--panel);
+      color: var(--text);
+    }
+    button {
+      cursor: pointer;
+      padding: 9px 14px;
+      background: var(--panel-2);
+      color: var(--text);
+      font-weight: 700;
+    }
+    button:hover:not(:disabled), button:focus-visible { border-color: var(--accent); }
+    button:disabled { cursor: wait; opacity: .55; }
+    .requests {
+      display: grid;
+      gap: 10px;
+    }
+    .request {
+      display: grid;
+      grid-template-columns: minmax(140px, 1fr) minmax(170px, auto) auto;
+      align-items: center;
+      gap: 16px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel);
+    }
+    .username { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+    .date { color: var(--muted); font-size: 12px; }
+    .approve { color: var(--success); }
+    .result {
+      display: none;
+      margin: 18px 0;
+      padding: 15px;
+      border: 1px solid var(--success);
+      background: var(--panel);
+    }
+    .result.visible { display: grid; gap: 10px; }
+    .code {
+      color: var(--accent);
+      font-size: 18px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .error { color: var(--danger); }
+    @media (max-width: 640px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .auth { grid-template-columns: 1fr; }
+      .request { grid-template-columns: 1fr; gap: 8px; }
+      .request button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>RECOVERY ADMIN</h1>
+        <p>Review and approve pending password recovery requests.</p>
+      </div>
+      <button id="refresh-btn" type="button">Refresh</button>
+    </header>
+
+    <form id="admin-auth" class="auth">
+      <input id="admin-key" type="password" autocomplete="off" placeholder="Admin API key" required>
+      <button type="submit">Load requests</button>
+    </form>
+
+    <div id="status" class="status">Enter the admin key to continue.</div>
+    <section id="approval-result" class="result" aria-live="polite">
+      <strong id="result-title"></strong>
+      <span id="result-code" class="code"></span>
+      <span id="result-expiry" class="date"></span>
+      <button id="copy-code" type="button">Copy recovery code</button>
+    </section>
+    <section id="requests" class="requests" aria-live="polite"></section>
+  </main>
+  <script src="js/recovery-admin.js"></script>
+</body>
+</html>
