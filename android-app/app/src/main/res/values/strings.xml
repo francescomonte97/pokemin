@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pokelike 1.6</string>
+    <string name="download_started">Download started</string>
+    <string name="file_picker_unavailable">File picker unavailable</string>
+    <string name="link_unavailable">No app can open this link</string>
+</resources>
