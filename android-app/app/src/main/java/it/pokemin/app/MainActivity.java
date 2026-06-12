@@ -1,12 +1,15 @@
 package it.pokemin.app;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
@@ -16,8 +19,14 @@ import android.nfc.tech.Ndef;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.view.animation.LinearInterpolator;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
@@ -28,6 +37,10 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
@@ -44,8 +57,39 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
     private static final String HOME_URL = "https://www.pokemin.it/";
     private static final int FILE_CHOOSER_REQUEST = 1001;
+    private static final String UI_PREFS = "pokelike_ui";
+    private static final String DARK_MODE_PREF = "dark_mode";
 
     private WebView webView;
+    private TextView nativeBackButton;
+    private LinearLayout nativeRunToolbar;
+    private ImageButton nativePokedexButton;
+    private TextView nativePokedexLoading;
+    private LinearLayout nativeLoadingOverlay;
+    private ImageView nativeLoadingPokeball;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean pokedexReady;
+    private boolean pendingPokedexOpen;
+    private long loadingShownAt;
+    private int loadingGeneration;
+    private ObjectAnimator splashRotation;
+    private int pokedexDotsStep;
+    private final Runnable pokedexDotsAnimation = new Runnable() {
+        @Override
+        public void run() {
+            if (
+                nativePokedexLoading == null ||
+                nativePokedexLoading.getVisibility() != View.VISIBLE
+            ) {
+                return;
+            }
+            pokedexDotsStep = pokedexDotsStep % 3 + 1;
+            nativePokedexLoading.setText(
+                pokedexDotsStep == 1 ? "." : pokedexDotsStep == 2 ? ".." : "..."
+            );
+            mainHandler.postDelayed(this, 320);
+        }
+    };
     private ValueCallback<Uri[]> fileChooserCallback;
     private String apkCustomizations;
     private NfcAdapter nfcAdapter;
@@ -57,8 +101,20 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.web_view);
+        nativeBackButton = findViewById(R.id.native_back_button);
+        nativeRunToolbar = findViewById(R.id.native_run_toolbar);
+        nativePokedexButton = findViewById(R.id.native_pokedex_button);
+        nativePokedexLoading = findViewById(R.id.native_pokedex_loading);
+        nativeLoadingOverlay = findViewById(R.id.native_loading_overlay);
+        nativeLoadingPokeball = findViewById(R.id.native_loading_pokeball);
+        loadingShownAt = SystemClock.elapsedRealtime();
+        splashRotation = createRotation(nativeLoadingPokeball, 850);
+        splashRotation.start();
+        applyStoredThemeBackground();
         apkCustomizations = readAsset("apk-customizations.js");
         configureWebView();
+        configureNativeControls();
+        configureSafeAreaInsets();
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         requestNotificationPermission();
 
@@ -94,8 +150,13 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> {
             if (webView == null) return;
             webView.evaluateJavascript(
-                "window.handlePokeLikeNfcTag&&window.handlePokeLikeNfcTag(" +
-                    JSONObject.quote(tagValue) + ")",
+                "(function retry(value,attempt){" +
+                    "if(window.handlePokeLikeNfcTag){" +
+                        "window.handlePokeLikeNfcTag(value);return;" +
+                    "}" +
+                    "window.__pokelikePendingNfcTag=value;" +
+                    "if(attempt<200)setTimeout(function(){retry(value,attempt+1)},100);" +
+                "})(" + JSONObject.quote(tagValue) + ",0)",
                 null
             );
         });
@@ -126,9 +187,6 @@ public class MainActivity extends Activity {
 
     private String readNdefRecord(NdefRecord record) {
         try {
-            Uri uri = record.toUri();
-            if (uri != null) return uri.toString().trim();
-
             byte[] payload = record.getPayload();
             if (payload == null || payload.length == 0) return "";
             if (record.getTnf() == NdefRecord.TNF_WELL_KNOWN &&
@@ -143,6 +201,9 @@ public class MainActivity extends Activity {
                     ).trim();
                 }
             }
+
+            Uri uri = record.toUri();
+            if (uri != null) return uri.toString().trim();
             return new String(payload, StandardCharsets.UTF_8).trim();
         } catch (Exception ignored) {
             return "";
@@ -166,6 +227,8 @@ public class MainActivity extends Activity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
         webView.addJavascriptInterface(networkDebugBridge, "PokeLikeDebug");
+        webView.addJavascriptInterface(new UiThemeBridge(), "PokeLikeTheme");
+        webView.addJavascriptInterface(new NativeUiBridge(), "PokeLikeNativeUi");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -194,15 +257,27 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                pokedexReady = false;
+                pendingPokedexOpen = false;
+                setPokedexLoading(false);
+                applyStoredThemeBackground();
+                super.onPageStarted(view, url, favicon);
+            }
+
+            @Override
             public void onPageCommitVisible(WebView view, String url) {
                 super.onPageCommitVisible(view, url);
                 applyApkCustomizations(view);
+                installNativePageBridge(view);
+                hideNativeLoading();
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 applyApkCustomizations(view);
+                installNativePageBridge(view);
             }
 
             @Override
@@ -239,6 +314,281 @@ public class MainActivity extends Activity {
         });
 
         webView.setDownloadListener(createDownloadListener());
+    }
+
+    private void configureNativeControls() {
+        nativeBackButton.setOnClickListener(view -> runGameCommand(
+            "try{if(typeof saveRun==='function')saveRun();}catch(e){}" +
+            "try{if(typeof cleanupTransientUI==='function')cleanupTransientUI();" +
+            "if(typeof showScreen==='function')showScreen('title-screen');" +
+            "if(typeof applyDarkMode==='function')applyDarkMode();}catch(e){}"
+        ));
+        findViewById(R.id.native_cup_button).setOnClickListener(
+            view -> runGameCommand(
+                "if(typeof openAchievementsModal==='function')openAchievementsModal()"
+            )
+        );
+        nativePokedexButton.setOnClickListener(view -> {
+            if (pokedexReady) {
+                openPokedex();
+            } else {
+                pendingPokedexOpen = true;
+                setPokedexLoading(true);
+            }
+        });
+        findViewById(R.id.native_settings_button).setOnClickListener(
+            view -> runGameCommand(
+                "if(typeof openSettingsModal==='function')openSettingsModal()"
+            )
+        );
+        findViewById(R.id.native_rerun_button).setOnClickListener(
+            view -> runGameCommand(
+                "if(typeof confirmResetRun==='function')confirmResetRun()"
+            )
+        );
+    }
+
+    private void configureSafeAreaInsets() {
+        final int baseTopMargin = Math.round(
+            12f * getResources().getDisplayMetrics().density
+        );
+        nativeRunToolbar.setOnApplyWindowInsetsListener((view, insets) -> {
+            ViewGroup.MarginLayoutParams params =
+                (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+            int safeTop = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ? insets.getInsets(
+                    WindowInsets.Type.statusBars() |
+                    WindowInsets.Type.displayCutout()
+                ).top
+                : insets.getSystemWindowInsetTop();
+            int desiredTop = baseTopMargin + safeTop;
+            if (params.topMargin != desiredTop) {
+                params.topMargin = desiredTop;
+                view.setLayoutParams(params);
+            }
+            return insets;
+        });
+        nativeRunToolbar.requestApplyInsets();
+    }
+
+    private void runGameCommand(String command) {
+        if (webView == null) return;
+        webView.evaluateJavascript("(function(){" + command + "})()", null);
+    }
+
+    private void openPokedex() {
+        pendingPokedexOpen = false;
+        setPokedexLoading(false);
+        runGameCommand(
+            "if(typeof openPokedexModal==='function')openPokedexModal('normal')"
+        );
+    }
+
+    private void setPokedexLoading(boolean loading) {
+        nativePokedexLoading.setVisibility(loading ? View.VISIBLE : View.GONE);
+        mainHandler.removeCallbacks(pokedexDotsAnimation);
+        if (loading) {
+            pokedexDotsStep = 0;
+            mainHandler.post(pokedexDotsAnimation);
+        } else {
+            nativePokedexLoading.setText("");
+        }
+    }
+
+    private void showNativeLoading() {
+        nativeLoadingOverlay.animate().cancel();
+        loadingGeneration++;
+        loadingShownAt = SystemClock.elapsedRealtime();
+        nativeLoadingOverlay.setAlpha(1f);
+        nativeLoadingOverlay.setVisibility(View.VISIBLE);
+        nativeLoadingOverlay.bringToFront();
+        if (!splashRotation.isStarted()) splashRotation.start();
+    }
+
+    private void hideNativeLoading() {
+        if (nativeLoadingOverlay.getVisibility() != View.VISIBLE) return;
+        int generation = loadingGeneration;
+        long remaining = Math.max(
+            0L,
+            1000L - (SystemClock.elapsedRealtime() - loadingShownAt)
+        );
+        mainHandler.postDelayed(() -> {
+            if (generation != loadingGeneration) return;
+            if (nativeLoadingOverlay.getVisibility() != View.VISIBLE) return;
+            nativeLoadingOverlay.animate()
+                .alpha(0f)
+                .setDuration(220)
+                .withEndAction(() -> {
+                    nativeLoadingOverlay.setVisibility(View.GONE);
+                    splashRotation.cancel();
+                    nativeLoadingPokeball.setRotation(0f);
+                })
+                .start();
+        }, remaining);
+    }
+
+    private void updateNativeControls(String screenId) {
+        boolean title = "title-screen".equals(screenId);
+        boolean towerSelect = "endless-stage-select".equals(screenId);
+        boolean map = "map-screen".equals(screenId);
+
+        nativeBackButton.setVisibility(!title && !towerSelect ? View.VISIBLE : View.GONE);
+        nativeRunToolbar.setVisibility(map ? View.VISIBLE : View.GONE);
+
+        if (nativeBackButton.getVisibility() == View.VISIBLE) nativeBackButton.bringToFront();
+        if (nativeRunToolbar.getVisibility() == View.VISIBLE) nativeRunToolbar.bringToFront();
+    }
+
+    private ObjectAnimator createRotation(View view, long durationMs) {
+        ObjectAnimator animator = ObjectAnimator.ofFloat(view, View.ROTATION, 0f, 360f);
+        animator.setDuration(durationMs);
+        animator.setRepeatCount(ObjectAnimator.INFINITE);
+        animator.setInterpolator(new LinearInterpolator());
+        return animator;
+    }
+
+    private void installNativePageBridge(WebView view) {
+        view.evaluateJavascript(
+            "(function(){" +
+                "if(window.__pokelikeNativeBridgeInstalled){" +
+                    "window.__pokelikeNativeReport&&window.__pokelikeNativeReport();return;" +
+                "}" +
+                "window.__pokelikeNativeBridgeInstalled=true;" +
+                "window.__pokelikeNativeDexReady=false;" +
+                "window.__pokelikeNativeDexButtons=[];" +
+                "window.__pokelikeNativeDexDotsTimer=0;" +
+                "window.__pokelikeNativeStartDexDots=function(button){" +
+                    "if(button&&window.__pokelikeNativeDexButtons.indexOf(button)<0)" +
+                        "window.__pokelikeNativeDexButtons.push(button);" +
+                    "if(window.__pokelikeNativeDexDotsTimer)return;" +
+                    "var step=0;" +
+                    "window.__pokelikeNativeDexDotsTimer=setInterval(function(){" +
+                        "step=step%3+1;" +
+                        "window.__pokelikeNativeDexButtons.forEach(function(item){" +
+                            "if(item&&document.body.contains(item))" +
+                                "item.setAttribute('data-pokelike-dex-loading'," +
+                                    "step===1?'.':step===2?'..':'...');" +
+                        "});" +
+                    "},320);" +
+                "};" +
+                "window.__pokelikeNativeStopDexDots=function(){" +
+                    "clearInterval(window.__pokelikeNativeDexDotsTimer);" +
+                    "window.__pokelikeNativeDexDotsTimer=0;" +
+                    "window.__pokelikeNativeDexButtons.forEach(function(item){" +
+                        "if(item)item.removeAttribute('data-pokelike-dex-loading');" +
+                    "});" +
+                    "window.__pokelikeNativeDexButtons=[];" +
+                "};" +
+                "window.__pokelikeNativeReport=function(){" +
+                    "var active=document.querySelector('.screen.active');" +
+                    "PokeLikeNativeUi.onScreenChanged(active?active.id:'');" +
+                "};" +
+                "new MutationObserver(window.__pokelikeNativeReport).observe(document.body,{" +
+                    "subtree:true,attributes:true,attributeFilter:['class']" +
+                "});" +
+                "document.addEventListener('click',function(event){" +
+                    "var target=event.target&&event.target.closest?event.target.closest('button'):null;" +
+                    "if(!target)return;" +
+                    "var action=target.getAttribute('onclick')||'';" +
+                    "if(action.indexOf('openPokedexModal')!==-1&&!window.__pokelikeNativeDexReady){" +
+                        "event.preventDefault();event.stopImmediatePropagation();" +
+                        "window.__pokelikeNativeStartDexDots(target);" +
+                        "PokeLikeNativeUi.onPokedexRequested();return;" +
+                    "}" +
+                    "if(target.id==='auth-login-btn'||target.id==='auth-register-btn'){" +
+                        "setTimeout(function(){" +
+                            "if(!target.disabled)return;" +
+                            "PokeLikeNativeUi.onAuthLoading(true);" +
+                            "var timer=setInterval(function(){" +
+                                "if(!document.body.contains(target)||!target.disabled){" +
+                                    "clearInterval(timer);PokeLikeNativeUi.onAuthLoading(false);" +
+                                "}" +
+                            "},120);" +
+                            "setTimeout(function(){clearInterval(timer);" +
+                                "PokeLikeNativeUi.onAuthLoading(false)},18000);" +
+                        "},0);" +
+                    "}" +
+                "},true);" +
+                "var loadData=typeof loadStaticPokedex==='function'" +
+                    "?Promise.resolve(loadStaticPokedex()).catch(function(){})" +
+                    ":Promise.resolve();" +
+                "var loadSprites=new Promise(function(resolve){" +
+                    "var done=0,images=[];" +
+                    "function finish(){done++;if(done===649)resolve();}" +
+                    "for(var id=1;id<=649;id++){" +
+                        "var image=new Image();images.push(image);" +
+                        "image.onload=finish;image.onerror=finish;" +
+                        "image.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/" +
+                            "sprites/pokemon/'+id+'.png';" +
+                    "}" +
+                    "window.__pokelikeNativeDexImages=images;" +
+                "});" +
+                "Promise.all([loadData,loadSprites]).then(function(){" +
+                    "window.__pokelikeNativeDexReady=true;" +
+                    "window.__pokelikeNativeStopDexDots();" +
+                    "PokeLikeNativeUi.onPokedexReady();" +
+                "});" +
+                "window.__pokelikeNativeReport();" +
+            "})()",
+            null
+        );
+    }
+
+    private void applyStoredThemeBackground() {
+        boolean dark = getSharedPreferences(UI_PREFS, MODE_PRIVATE)
+            .getBoolean(DARK_MODE_PREF, false);
+        int color = Color.parseColor(dark ? "#11100d" : "#e8e4d8");
+        if (webView != null) webView.setBackgroundColor(color);
+        if (nativeLoadingOverlay != null) nativeLoadingOverlay.setBackgroundColor(color);
+        getWindow().setStatusBarColor(color);
+        getWindow().setNavigationBarColor(color);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int flags = getWindow().getDecorView().getSystemUiVisibility();
+            if (dark) flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            else flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+        }
+    }
+
+    private final class UiThemeBridge {
+        @JavascriptInterface
+        public void setDarkMode(boolean dark) {
+            SharedPreferences preferences = getSharedPreferences(UI_PREFS, MODE_PRIVATE);
+            preferences.edit().putBoolean(DARK_MODE_PREF, dark).apply();
+            runOnUiThread(MainActivity.this::applyStoredThemeBackground);
+        }
+    }
+
+    private final class NativeUiBridge {
+        @JavascriptInterface
+        public void onScreenChanged(String screenId) {
+            runOnUiThread(() -> updateNativeControls(screenId));
+        }
+
+        @JavascriptInterface
+        public void onPokedexRequested() {
+            runOnUiThread(() -> {
+                pendingPokedexOpen = true;
+                setPokedexLoading(true);
+            });
+        }
+
+        @JavascriptInterface
+        public void onPokedexReady() {
+            runOnUiThread(() -> {
+                pokedexReady = true;
+                setPokedexLoading(false);
+                if (pendingPokedexOpen) openPokedex();
+            });
+        }
+
+        @JavascriptInterface
+        public void onAuthLoading(boolean loading) {
+            runOnUiThread(() -> {
+                if (loading) showNativeLoading();
+                else hideNativeLoading();
+            });
+        }
     }
 
     private static final class NetworkDebugBridge {
@@ -413,6 +763,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        mainHandler.removeCallbacksAndMessages(null);
+        if (splashRotation != null) splashRotation.cancel();
         if (webView != null) {
             webView.loadUrl("about:blank");
             webView.stopLoading();

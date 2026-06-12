@@ -51,19 +51,23 @@
       margin: 15px 0 7px;
       font-weight: 700;
     }
-    textarea, button {
+    textarea, input, button {
       width: 100%;
       border: 1px solid var(--border);
       border-radius: 4px;
       font: inherit;
     }
-    textarea {
+    textarea, input {
       min-height: 88px;
       resize: vertical;
       padding: 11px;
       background: #0d1117;
       color: var(--text);
       overflow-wrap: anywhere;
+    }
+    input {
+      min-height: 43px;
+      resize: none;
     }
     .actions {
       display: grid;
@@ -119,6 +123,10 @@
     <label for="tag-value">Valore del tag</label>
     <textarea id="tag-value" autocomplete="off" spellcheck="false"></textarea>
 
+    <label for="admin-key">ADMIN_API_KEY</label>
+    <input id="admin-key" type="password" autocomplete="off"
+      placeholder="Chiave amministrativa del Worker">
+
     <div class="actions">
       <button id="generate" type="button">Genera valore</button>
       <button id="copy-value" type="button">Copia valore</button>
@@ -135,7 +143,8 @@
     <output id="status" aria-live="polite">Pronto.</output>
     <p class="note">
       Richiede Chrome su Android, NFC attivo e una pagina servita tramite HTTPS.
-      Il valore non viene inviato ad alcun server.
+      Dopo la scrittura, il solo hash viene sostituito automaticamente in Firestore.
+      La chiave amministrativa resta esclusivamente nella scheda corrente.
     </p>
   </main>
 
@@ -144,6 +153,11 @@
     const hashOutput = document.getElementById('tag-hash');
     const status = document.getElementById('status');
     const writeButton = document.getElementById('write');
+    const adminKeyInput = document.getElementById('admin-key');
+    const workerUrl =
+      'https://pokemin-save-recovery.montefortefrancesco50.workers.dev';
+
+    adminKeyInput.value = sessionStorage.getItem('pokelike_nfc_admin_key') || '';
 
     function randomSecret() {
       const bytes = crypto.getRandomValues(new Uint8Array(24));
@@ -164,6 +178,26 @@
     async function refreshHash() {
       const value = valueInput.value.trim();
       hashOutput.value = value ? await sha256Hex(value) : '';
+    }
+
+    async function updateFirestoreTagHash(tagHash) {
+      const adminKey = adminKeyInput.value.trim();
+      if (!adminKey) throw new Error('Inserisci ADMIN_API_KEY.');
+      sessionStorage.setItem('pokelike_nfc_admin_key', adminKey);
+
+      const response = await fetch(`${workerUrl}/admin/debug-nfc`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ tagHash })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || `Aggiornamento Firestore fallito (${response.status}).`);
+      }
+      return data;
     }
 
     async function copyText(value, label) {
@@ -195,6 +229,12 @@
         status.textContent = 'Genera o inserisci prima un valore.';
         return;
       }
+      if (!adminKeyInput.value.trim()) {
+        status.className = 'error';
+        status.textContent = 'Inserisci ADMIN_API_KEY prima di scrivere il tag.';
+        adminKeyInput.focus();
+        return;
+      }
       if (!('NDEFReader' in window)) {
         status.className = 'error';
         status.textContent = 'Web NFC non disponibile. Usa Chrome su Android tramite HTTPS.';
@@ -214,8 +254,10 @@
           }]
         });
         await refreshHash();
+        status.textContent = 'Tag scritto. Aggiornamento Firestore...';
+        await updateFirestoreTagHash(hashOutput.value);
         status.className = 'ok';
-        status.textContent = 'Tag scritto correttamente. Aggiungi l’hash a nfcTagHashes in Firestore.';
+        status.textContent = 'Tag scritto e autorizzazione Firestore aggiornata correttamente.';
       } catch (error) {
         status.className = 'error';
         status.textContent = `Scrittura non riuscita: ${error.message || error}`;

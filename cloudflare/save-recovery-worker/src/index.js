@@ -49,6 +49,10 @@ export default {
         return approveRecoveryRequest(request, env, cors);
       }
 
+      if (request.method === 'POST' && url.pathname === '/admin/debug-nfc') {
+        return updateDebugNfcTag(request, env, cors);
+      }
+
       if (request.method === 'POST' && url.pathname === '/reset-password') {
         return resetRecoveryPassword(request, env, cors);
       }
@@ -242,6 +246,29 @@ async function approveRecoveryRequest(request, env, cors) {
   }, 200, cors);
 }
 
+async function updateDebugNfcTag(request, env, cors) {
+  if (!isAdminRequest(request, env)) return json({ error: 'Unauthorized.' }, 401, cors);
+
+  const body = await readJson(request);
+  const tagHash = String(body.tagHash || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(tagHash)) {
+    return json({ error: 'Invalid NFC tag hash.' }, 400, cors);
+  }
+
+  await setDocument(env, 'app_config', 'debug_access', {
+    enabled: true,
+    nfcTagHash: tagHash,
+    nfcTagHashes: [tagHash],
+    updatedAt: new Date(),
+  });
+
+  return json({
+    ok: true,
+    enabled: true,
+    tagHash,
+  }, 200, cors);
+}
+
 async function resetRecoveryPassword(request, env, cors) {
   const body = await readJson(request);
   const usernameKey = normalizeUsername(body.username);
@@ -374,6 +401,9 @@ async function readJson(request) {
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '';
   const allowedOrigin = env.ALLOWED_ORIGIN || '';
+  const alternateAllowedOrigin = allowedOrigin.includes('://www.')
+    ? allowedOrigin.replace('://www.', '://')
+    : allowedOrigin.replace('://', '://www.');
   const isLocalDevelopment = /^https?:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(origin);
   const headers = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -383,7 +413,11 @@ function corsHeaders(request, env) {
     'Content-Type': 'application/json; charset=utf-8',
     'Vary': 'Origin',
   };
-  if (origin === allowedOrigin || isLocalDevelopment) {
+  if (
+    origin === allowedOrigin ||
+    origin === alternateAllowedOrigin ||
+    isLocalDevelopment
+  ) {
     headers['Access-Control-Allow-Origin'] = origin;
   }
   return headers;

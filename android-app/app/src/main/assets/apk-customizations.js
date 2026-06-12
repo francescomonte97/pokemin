@@ -910,6 +910,8 @@
     var trailing = value.match(/\s*$/)[0];
     var core = value.trim();
     if (!core) return value;
+    var dynamic = translateDynamicRunText(core);
+    if (dynamic !== core) return leading + dynamic + trailing;
     if (map[core]) return leading + map[core] + trailing;
 
     var translated = core;
@@ -926,6 +928,134 @@
         });
       });
     return leading + translated + trailing;
+  }
+
+  var runMessageLocales = {
+    fr: {
+      wild:'Un {name} sauvage apparaît !', level:'Niveau {level}',
+      gym:'Combat d’Arène : {name} !', badge:'La Badge {badge} est en jeu !',
+      wants:'{name} veut combattre !', elite:'Conseil 4 — Combat {now}/{total}',
+      defeated:'{name} vaincu !', legendary:'Un {name} légendaire apparaît !',
+      legendarySub:'Niv. {level} — Battez-le pour l’ajouter à votre équipe !',
+      teamLevel:'{count} Pokémon — Niv. ~{level}', earned:'Vous obtenez la Badge {badge} !',
+      badges:'Badges : {count}/8', championship:'Championnat n°{count}',
+      complete:'{name} terminé !', unlocked:'{name} débloqué !',
+      evolve:'Quoi ? {name} évolue !', evolved:'{name} évolue en {into} !',
+      chooseEvolution:'Choisissez son évolution :', finding:'Recherche de Pokémon...',
+      starters:'Chargement des starters...', bagEmpty:'Sac vide',
+      superEffective:' Super efficace !', noEffect:' Aucun effet !',
+      notEffective:' Peu efficace...', criticalHit:' Coup critique !',
+      fainted:'{name} est K.O. !', enemy:'(ennemi) '
+    },
+    it: {
+      wild:'È apparso un {name} selvatico!', level:'Livello {level}',
+      gym:'Lotta in Palestra: {name}!', badge:'La medaglia {badge} è in palio!',
+      wants:'{name} vuole lottare!', elite:'Superquattro — Lotta {now}/{total}',
+      defeated:'{name} sconfitto!', legendary:'È apparso un {name} leggendario!',
+      legendarySub:'Lv. {level} — Sconfiggilo per aggiungerlo alla squadra!',
+      teamLevel:'{count} Pokémon — Lv. ~{level}', earned:'Hai ottenuto la medaglia {badge}!',
+      badges:'Medaglie: {count}/8', championship:'Campionato n. {count}',
+      complete:'{name} completato!', unlocked:'{name} sbloccato!',
+      evolve:'Cosa? {name} si sta evolvendo!', evolved:'{name} si è evoluto in {into}!',
+      chooseEvolution:'Scegli la sua evoluzione:', finding:'Ricerca Pokémon...',
+      starters:'Caricamento starter...', bagEmpty:'Borsa vuota',
+      superEffective:' Superefficace!', noEffect:' Nessun effetto!',
+      notEffective:' Poco efficace...', criticalHit:' Brutto colpo!',
+      fainted:'{name} è esausto!', enemy:'(nemico) '
+    },
+    es: {
+      wild:'¡Apareció un {name} salvaje!', level:'Nivel {level}',
+      gym:'¡Combate de Gimnasio: {name}!', badge:'¡La medalla {badge} está en juego!',
+      wants:'¡{name} quiere luchar!', elite:'Alto Mando — Combate {now}/{total}',
+      defeated:'¡{name} derrotado!', legendary:'¡Apareció un {name} legendario!',
+      legendarySub:'Nv. {level} — ¡Derrótalo para añadirlo al equipo!',
+      teamLevel:'{count} Pokémon — Nv. ~{level}', earned:'¡Conseguiste la medalla {badge}!',
+      badges:'Medallas: {count}/8', championship:'Campeonato n.º {count}',
+      complete:'¡{name} completado!', unlocked:'¡{name} desbloqueado!',
+      evolve:'¿Qué? ¡{name} está evolucionando!', evolved:'¡{name} evolucionó a {into}!',
+      chooseEvolution:'Elige su evolución:', finding:'Buscando Pokémon...',
+      starters:'Cargando iniciales...', bagEmpty:'Mochila vacía',
+      superEffective:' ¡Es supereficaz!', noEffect:' ¡No afecta!',
+      notEffective:' No es muy eficaz...', criticalHit:' ¡Golpe crítico!',
+      fainted:'¡{name} se debilitó!', enemy:'(rival) '
+    },
+    de: {
+      wild:'Ein wildes {name} erscheint!', level:'Level {level}',
+      gym:'Arenakampf gegen {name}!', badge:'Der {badge}-Orden steht auf dem Spiel!',
+      wants:'{name} fordert dich heraus!', elite:'Top Vier — Kampf {now}/{total}',
+      defeated:'{name} besiegt!', legendary:'Ein legendäres {name} erscheint!',
+      legendarySub:'Lv. {level} — Besiege es und nimm es ins Team auf!',
+      teamLevel:'{count} Pokémon — Lv. ~{level}', earned:'Du erhältst den {badge}-Orden!',
+      badges:'Orden: {count}/8', championship:'Meisterschaft Nr. {count}',
+      complete:'{name} abgeschlossen!', unlocked:'{name} freigeschaltet!',
+      evolve:'Was? {name} entwickelt sich!', evolved:'{name} entwickelt sich zu {into}!',
+      chooseEvolution:'Wähle seine Entwicklung:', finding:'Pokémon werden gesucht...',
+      starters:'Starter werden geladen...', bagEmpty:'Beutel leer',
+      superEffective:' Sehr effektiv!', noEffect:' Keine Wirkung!',
+      notEffective:' Nicht sehr effektiv...', criticalHit:' Volltreffer!',
+      fainted:'{name} wurde besiegt!', enemy:'(Gegner) '
+    },
+    pt: {
+      wild:'Um {name} selvagem apareceu!', level:'Nível {level}',
+      gym:'Batalha de Ginásio: {name}!', badge:'A insígnia {badge} está em jogo!',
+      wants:'{name} quer batalhar!', elite:'Elite dos Quatro — Batalha {now}/{total}',
+      defeated:'{name} derrotado!', legendary:'Um {name} lendário apareceu!',
+      legendarySub:'Nv. {level} — Derrote-o para adicioná-lo à equipe!',
+      teamLevel:'{count} Pokémon — Nv. ~{level}', earned:'Você ganhou a insígnia {badge}!',
+      badges:'Insígnias: {count}/8', championship:'Campeonato nº {count}',
+      complete:'{name} concluído!', unlocked:'{name} desbloqueado!',
+      evolve:'O quê? {name} está evoluindo!', evolved:'{name} evoluiu para {into}!',
+      chooseEvolution:'Escolha sua evolução:', finding:'Procurando Pokémon...',
+      starters:'Carregando iniciais...', bagEmpty:'Mochila vazia',
+      superEffective:' Super eficaz!', noEffect:' Sem efeito!',
+      notEffective:' Pouco eficaz...', criticalHit:' Golpe crítico!',
+      fainted:'{name} desmaiou!', enemy:'(adversário) '
+    }
+  };
+
+  function translateDynamicRunText(text) {
+    if (currentLanguage === 'en') return text;
+    var locale = runMessageLocales[currentLanguage];
+    if (!locale) return text;
+    var rules = [
+      [/^Wild (.+) appeared!$/, 'wild', ['name']],
+      [/^Level (.+)$/, 'level', ['level']],
+      [/^Gym Battle vs (.+)!$/, 'gym', ['name']],
+      [/^(.+) is on the line!$/, 'badge', ['badge']],
+      [/^(.+) wants to battle!$/, 'wants', ['name']],
+      [/^Elite Four - Battle (\d+)\/(\d+)$/, 'elite', ['now','total']],
+      [/^(.+) defeated!$/, 'defeated', ['name']],
+      [/^A legendary (.+) appeared!$/, 'legendary', ['name']],
+      [/^Lv (.+) — Defeat it to add it to your team!$/, 'legendarySub', ['level']],
+      [/^(\d+) Pokémon — Lv ~(.+)$/, 'teamLevel', ['count','level']],
+      [/^You earned the (.+)!$/, 'earned', ['badge']],
+      [/^Badges: (\d+)\/8$/, 'badges', ['count']],
+      [/^Championship #(\d+)$/, 'championship', ['count']],
+      [/^(.+) Complete!$/, 'complete', ['name']],
+      [/^(.+) unlocked!$/, 'unlocked', ['name']],
+      [/^What\? (.+) is evolving!$/, 'evolve', ['name']],
+      [/^(.+) evolved into (.+)!$/, 'evolved', ['name','into']]
+    ];
+    for (var rule of rules) {
+      var match = text.match(rule[0]);
+      if (!match) continue;
+      var values = {};
+      rule[2].forEach(function (key, index) { values[key] = match[index + 1]; });
+      return fillTemplate(locale[rule[1]], values);
+    }
+    if (text === 'Choose its evolution:') return locale.chooseEvolution;
+    if (text === 'Finding Pokemon...') return locale.finding;
+    if (text === 'Loading starters...') return locale.starters;
+    if (text === 'Bag empty') return locale.bagEmpty;
+    return text
+      .replace(' Super effective!', locale.superEffective)
+      .replace(' No effect!', locale.noEffect)
+      .replace(' Not very effective...', locale.notEffective)
+      .replace(' Critical hit!', locale.criticalHit)
+      .replace(/^\(enemy\) /, locale.enemy)
+      .replace(/^(.+) fainted!$/, function (_, name) {
+        return fillTemplate(locale.fainted, { name:name });
+      });
   }
 
   function translateNode(node) {
@@ -1563,7 +1693,24 @@
             warmed.style.removeProperty('z-index');
             return Promise.resolve();
           }
-          return fastPokedex(initialTab);
+          var incompleteWarmup = document.getElementById('pokedex-modal');
+          if (incompleteWarmup) incompleteWarmup.remove();
+          return new Promise(function (resolve) {
+            requestAnimationFrame(function () {
+              requestAnimationFrame(function () {
+                Promise.resolve(fastPokedex(initialTab))
+                  .then(function () {
+                    waitForPokedexCards(function () {
+                      preparePokedexSkeletons();
+                      resolve();
+                    }, 4500);
+                  })
+                  .catch(function () {
+                    resolve();
+                  });
+              });
+            });
+          });
         };
         openPokedexModal.__pokelike649 = true;
         openPokedexModal.__pokelikeOriginal = fastPokedex;
@@ -1660,6 +1807,46 @@
     } catch (error) {}
   }
 
+  function waitForPokedexCards(callback, timeout, expectedModal) {
+    var started = Date.now();
+    function check() {
+      var modal = document.getElementById('pokedex-modal');
+      if (expectedModal && modal !== expectedModal) {
+        callback(false);
+        return;
+      }
+      if (modal?.querySelector('.dex-card')) {
+        callback(true);
+        return;
+      }
+      if (Date.now() - started >= timeout) {
+        callback(false);
+        return;
+      }
+      requestAnimationFrame(check);
+    }
+    check();
+  }
+
+  var preloadedPokedexSprites = [];
+
+  function preloadPokedexSprites() {
+    if (preloadedPokedexSprites.length) return;
+    var base = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
+    var nextId = 1;
+    function loadBatch() {
+      var batchEnd = Math.min(649, nextId + 23);
+      for (; nextId <= batchEnd; nextId++) {
+        var image = new Image();
+        image.decoding = 'async';
+        image.src = base + nextId + '.png';
+        preloadedPokedexSprites.push(image);
+      }
+      if (nextId <= 649) setTimeout(loadBatch, 90);
+    }
+    loadBatch();
+  }
+
   function warmPokedexModal() {
     if (pokedexWarmupPending || document.getElementById('pokedex-modal')) return;
     if (typeof isPlayerLoggedIn === 'function' && !isPlayerLoggedIn()) return;
@@ -1673,12 +1860,17 @@
     pokedexWarmupPending = true;
     Promise.resolve(openPokedexModal.__pokelikeOriginal('normal'))
       .then(function () {
-        var modal = document.getElementById('pokedex-modal');
-        if (!modal) return;
-        modal.dataset.pokelikeWarmed = '1';
-        modal.style.visibility = 'hidden';
-        modal.style.pointerEvents = 'none';
-        modal.style.zIndex = '-1';
+        var warmModal = document.getElementById('pokedex-modal');
+        if (!warmModal) return;
+        waitForPokedexCards(function (ready) {
+          var modal = document.getElementById('pokedex-modal');
+          if (!modal || modal !== warmModal || !ready) return;
+          preparePokedexSkeletons();
+          modal.dataset.pokelikeWarmed = '1';
+          modal.style.visibility = 'hidden';
+          modal.style.pointerEvents = 'none';
+          modal.style.zIndex = '-1';
+        }, 6000, warmModal);
       })
       .catch(function () {})
       .finally(function () {
@@ -1705,9 +1897,69 @@
     });
   }
 
+  function prepareAsyncMediaSkeletons(root) {
+    var scope = root?.querySelectorAll ? root : document;
+    var selector = [
+      '.poke-sprite', '.battle-sprite', '.team-sprite', '.pc-slot img',
+      '.equip-poke-sprite', '.trade-member-sprite', '.dex-detail-sprite',
+      '#evo-sprite', '#eevee-choices img', 'img[src*="/sprites/pokemon/"]'
+    ].join(',');
+    scope.querySelectorAll(selector).forEach(function (image) {
+      if (image.dataset.pokelikeMediaSkeleton === '1') return;
+      image.dataset.pokelikeMediaSkeleton = '1';
+      image.classList.add('pokelike-media-loading');
+      function finish() {
+        image.classList.remove('pokelike-media-loading');
+        image.classList.add('pokelike-media-loaded');
+      }
+      if (image.complete) finish();
+      else {
+        image.addEventListener('load', finish, { once:true });
+        image.addEventListener('error', finish, { once:true });
+      }
+    });
+    scope.querySelectorAll('.loading,.dex-loading').forEach(function (element) {
+      element.classList.add('pokelike-loading-block');
+    });
+  }
+
+  function syncNativeTheme() {
+    var dark = false;
+    try {
+      dark = typeof getSettings === 'function' && !!getSettings().darkMode;
+    } catch (error) {}
+    document.documentElement.classList.toggle('dark-mode', dark);
+    document.documentElement.style.backgroundColor = dark ? '#11100d' : '#e8e4d8';
+    try { window.PokeLikeTheme?.setDarkMode(dark); } catch (error) {}
+    if (!document.body?.classList.contains('pokelike-theme-ready')) {
+      requestAnimationFrame(function () {
+        document.body?.classList.add('pokelike-theme-ready');
+      });
+    }
+  }
+
+  function installThemeSync() {
+    try {
+      if (typeof applyDarkMode === 'function' && !applyDarkMode.__pokelikeThemeSync) {
+        var originalApplyDarkMode = applyDarkMode;
+        applyDarkMode = function () {
+          var result = originalApplyDarkMode.apply(this, arguments);
+          syncNativeTheme();
+          return result;
+        };
+        applyDarkMode.__pokelikeThemeSync = true;
+      }
+    } catch (error) {}
+    syncNativeTheme();
+  }
+
   var runBackupTimer = 0;
   var lastRunBackupPayload = '';
   var runRestoreUuid = '';
+  var runRestoreInFlight = false;
+  var runRestoreLastAttempt = 0;
+  var runRestoreCandidate = '';
+  var runRestoreMisses = 0;
 
   function scheduleRunBackup(force) {
     if (runBackupTimer && !force) return;
@@ -1723,9 +1975,27 @@
       if (!force && payload === lastRunBackupPayload) return;
       lastRunBackupPayload = payload;
       backupApi.save(uuid, currentRun, endlessState).catch(function (error) {
+        if (lastRunBackupPayload === payload) lastRunBackupPayload = '';
         console.warn('Run backup failed:', error);
       });
-    }, force ? 0 : 12000);
+    }, force ? 0 : 1000);
+  }
+
+  function backupCurrentRunNow() {
+    var uuid = localStorage.getItem('poke_save_uuid');
+    var currentRun = localStorage.getItem('poke_current_run');
+    var backupApi = window.pokeFirestoreRunBackup;
+    if (!uuid || !currentRun || typeof backupApi?.save !== 'function') return;
+    var endlessState = localStorage.getItem('poke_endless_state');
+    var payload = currentRun + '\n' + (endlessState || '');
+    backupApi.save(uuid, currentRun, endlessState)
+      .then(function () {
+        lastRunBackupPayload = payload;
+      })
+      .catch(function (error) {
+        lastRunBackupPayload = '';
+        console.warn('Immediate run backup failed:', error);
+      });
   }
 
   function refreshContinueRunButtons() {
@@ -1762,26 +2032,45 @@
   async function restoreRunBackupIfNeeded() {
     var uuid = localStorage.getItem('poke_save_uuid');
     var backupApi = window.pokeFirestoreRunBackup;
-    if (!uuid || uuid === runRestoreUuid || localStorage.getItem('poke_current_run')) {
+    if (!uuid || localStorage.getItem('poke_current_run')) {
       refreshContinueRunButtons();
       return;
     }
     if (typeof backupApi?.load !== 'function') return;
+    if (uuid !== runRestoreCandidate) {
+      runRestoreCandidate = uuid;
+      runRestoreMisses = 0;
+      runRestoreUuid = '';
+    }
+    if (runRestoreInFlight) return;
+    if (uuid === runRestoreUuid) return;
+    if (Date.now() - runRestoreLastAttempt < 1000) return;
 
-    runRestoreUuid = uuid;
+    runRestoreInFlight = true;
+    runRestoreLastAttempt = Date.now();
     try {
       var backup = await backupApi.load(uuid);
-      if (!backup?.currentRun || localStorage.getItem('poke_current_run')) return;
+      if (!backup?.currentRun || localStorage.getItem('poke_current_run')) {
+        runRestoreMisses++;
+        runRestoreUuid = runRestoreMisses >= 5 ? uuid : '';
+        return;
+      }
       JSON.parse(backup.currentRun);
       localStorage.setItem('poke_current_run', backup.currentRun);
       if (backup.endlessState) {
         JSON.parse(backup.endlessState);
         localStorage.setItem('poke_endless_state', backup.endlessState);
       }
+      runRestoreUuid = uuid;
+      runRestoreMisses = 0;
+      lastRunBackupPayload =
+        backup.currentRun + '\n' + (backup.endlessState || '');
       refreshContinueRunButtons();
     } catch (error) {
       console.warn('Run restore failed:', error);
       runRestoreUuid = '';
+    } finally {
+      runRestoreInFlight = false;
     }
   }
 
@@ -1812,6 +2101,14 @@
         clearSavedRun.__pokelikeBackup = true;
       }
     } catch (error) {}
+    if (!window.__pokelikeRunSignoutBackup) {
+      window.__pokelikeRunSignoutBackup = true;
+      document.addEventListener('click', function (event) {
+        if (event.target?.closest?.('#account-signout-btn')) {
+          backupCurrentRunNow();
+        }
+      }, true);
+    }
     restoreRunBackupIfNeeded();
   }
 
@@ -2028,10 +2325,22 @@
     }
   }
 
+  var renderedNetworkLogSignature = null;
+
   function renderNetworkLogs() {
     var list = document.getElementById('pokelike-debug-list');
     if (!list) return;
     var logs = getNetworkLogs().slice().reverse();
+    var signature = logs.map(function (entry) {
+      return [
+        entry.time, entry.type, entry.method, entry.url,
+        entry.status, entry.duration, entry.error
+      ].join('|');
+    }).join('\n');
+    if (signature === renderedNetworkLogSignature && list.childNodes.length) {
+      return;
+    }
+    renderedNetworkLogSignature = signature;
     if (!logs.length) {
       list.textContent = 'No API, fetch or XHR calls recorded yet.';
       return;
@@ -2121,6 +2430,7 @@
 
   function openNetworkDebugModal() {
     document.getElementById('pokelike-debug-modal')?.remove();
+    renderedNetworkLogSignature = null;
     var modal = document.createElement('div');
     modal.id = 'pokelike-debug-modal';
     modal.innerHTML =
@@ -2147,6 +2457,7 @@
     modal.querySelector('#pokelike-debug-refresh').onclick = renderNetworkLogs;
     modal.querySelector('#pokelike-debug-clear').onclick = function () {
       try { window.PokeLikeDebug?.clearLogs?.(); } catch (error) {}
+      renderedNetworkLogSignature = null;
       renderNetworkLogs();
     };
     modal.addEventListener('click', function (event) {
@@ -2181,48 +2492,36 @@
 
   function installNfcDebugAccess() {
     if (window.handlePokeLikeNfcTag?.__pokelikeInstalled) return;
+    window.openPokeLikeNetworkDebugModal = openNetworkDebugModal;
     var handler = async function (tagValue) {
       try {
-        var verifier = window.pokeFirestoreDebugAccess?.verifyTag;
-        if (typeof verifier !== 'function') return;
-        if (await verifier(tagValue)) openNetworkDebugModal();
+        var verifier = null;
+        for (var attempt = 0; attempt < 100; attempt++) {
+          verifier = window.pokeFirestoreDebugAccess?.verifyTag;
+          if (typeof verifier === 'function') break;
+          await new Promise(function (resolve) { setTimeout(resolve, 100); });
+        }
+        if (typeof verifier !== 'function') return false;
+        if (!(await verifier(tagValue))) return false;
+        openNetworkDebugModal();
+        return true;
       } catch (error) {
         console.warn('NFC debug verification failed:', error);
+        return false;
       }
     };
     handler.__pokelikeInstalled = true;
     window.handlePokeLikeNfcTag = handler;
+    if (window.__pokelikePendingNfcTag) {
+      var pendingTag = window.__pokelikePendingNfcTag;
+      window.__pokelikePendingNfcTag = '';
+      handler(pendingTag);
+    }
   }
 
   function ensureBackButton() {
     var button = document.getElementById('pokelike-apk-back');
-    if (!button) {
-      button = document.createElement('button');
-      button.id = 'pokelike-apk-back';
-      button.type = 'button';
-      button.setAttribute('aria-label', 'Back to main menu');
-      button.setAttribute('title', 'Back to main menu');
-      button.textContent = '\u2190';
-      button.addEventListener('click', function () {
-        try {
-          if (typeof saveRun === 'function') saveRun();
-        } catch (error) {}
-        try {
-          if (typeof cleanupTransientUI === 'function') cleanupTransientUI();
-          if (typeof applyDarkMode === 'function') applyDarkMode();
-          if (typeof showScreen === 'function') showScreen('title-screen');
-          if (typeof applyDarkMode === 'function') applyDarkMode();
-        } catch (error) {
-          window.location.reload();
-        }
-      });
-      document.body.appendChild(button);
-    }
-    var activeScreen = document.querySelector('.screen.active');
-    button.classList.toggle(
-      'pokelike-apk-back-visible',
-      !!activeScreen && activeScreen.id !== 'title-screen'
-    );
+    if (button) button.remove();
   }
 
   function ensureStyles() {
@@ -2253,6 +2552,55 @@
         'box-sizing:border-box;padding-top:calc(18px + env(safe-area-inset-top));' +
         'padding-bottom:calc(8px + env(safe-area-inset-bottom));zoom:.96' +
       '}' +
+      'html,body{background-color:#e8e4d8}' +
+      'html.dark-mode,body.dark-mode{background-color:#11100d}' +
+      'body.pokelike-theme-ready{' +
+        'transition:background-color .18s ease,color .18s ease' +
+      '}' +
+      '[data-pokelike-dex-loading]::after{' +
+        'content:attr(data-pokelike-dex-loading);display:inline-block;' +
+        'min-width:13px;margin-left:4px;color:#ffd84a;text-align:left' +
+      '}' +
+      '.screen.active:not(#title-screen){' +
+        'box-sizing:border-box;padding-top:max(16px,calc(12px + env(safe-area-inset-top)))' +
+      '}' +
+      '#battle-screen.active,#starter-screen.active,#endless-stage-select.active,' +
+      '#stat-buff-screen.active{' +
+        'padding-top:max(22px,calc(16px + env(safe-area-inset-top)))' +
+      '}' +
+      '.battle-header h2,.battle-header p,#map-info{' +
+        'max-width:calc(100vw - 32px);margin-left:auto;margin-right:auto;' +
+        'overflow-wrap:anywhere;line-height:1.45' +
+      '}' +
+      '@media(max-width:768px){' +
+        '#map-screen.active{' +
+          'padding-top:calc(10px + env(safe-area-inset-top))!important' +
+        '}' +
+        '#map-screen.active .map-actions{' +
+          'display:none!important' +
+        '}' +
+        '#map-screen.active .map-panels{' +
+          'box-sizing:border-box;padding-right:50px' +
+        '}' +
+        '#map-screen.active #team-bar{gap:2px!important}' +
+        '#map-screen.active #team-bar .team-sprite{' +
+          'width:27px!important;height:27px!important' +
+        '}' +
+        '#map-screen.active #team-bar .team-slot-name,' +
+        '#map-screen.active #team-bar .team-slot-lv{' +
+          'font-size:6px!important' +
+        '}' +
+        '#map-screen.active #item-bar{gap:3px!important}' +
+        '#map-screen.active #item-bar .item-badge{' +
+          'padding:2px!important' +
+        '}' +
+        '#map-screen.active #item-bar .item-sprite-icon{' +
+          'width:20px!important;height:20px!important' +
+        '}' +
+        '#battle-screen.active{padding-top:calc(12px + env(safe-area-inset-top))}' +
+        '.battle-header h2{font-size:10px!important}' +
+        '.battle-header p{font-size:9px!important}' +
+      '}' +
       '#title-screen .btn-primary{' +
         'box-sizing:border-box;width:220px;height:42px;padding:8px 12px;' +
         'display:inline-flex;align-items:center;justify-content:center;' +
@@ -2278,16 +2626,6 @@
       'body.dark-mode #title-screen>div[style*="max-width: 340px"]{' +
         'color:#ededed!important;opacity:.78!important;text-shadow:0 1px #000' +
       '}' +
-      '#pokelike-apk-back{' +
-        'position:fixed;left:10px;bottom:calc(12px + env(safe-area-inset-bottom));' +
-        'z-index:250;width:36px;height:36px;padding:0;display:none;' +
-        'align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.72);' +
-        'border-radius:6px;background:rgba(7,16,23,.84);color:#fff;' +
-        'font:700 22px/1 sans-serif;box-shadow:2px 2px 0 rgba(0,0,0,.72);' +
-        '-webkit-tap-highlight-color:transparent' +
-      '}' +
-      '#pokelike-apk-back.pokelike-apk-back-visible{display:flex}' +
-      '#pokelike-apk-back:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.72)}' +
       '.pokelike-apk-patch{' +
         'margin-bottom:18px;padding:12px;border:2px solid #72d6ff;border-radius:8px;' +
         'background:rgba(8,22,32,.9);box-shadow:3px 3px 0 #000' +
@@ -2349,6 +2687,21 @@
         'background-size:220% 100%;animation:pokelikeDexSkeleton 1.1s linear infinite' +
       '}' +
       '.dex-sprite.pokelike-dex-loaded{opacity:1;transition:opacity .16s ease}' +
+      '.pokelike-media-loading{' +
+        'background:linear-gradient(100deg,rgba(90,90,90,.18) 20%,' +
+        'rgba(180,180,180,.58) 45%,rgba(90,90,90,.18) 70%)!important;' +
+        'background-size:220% 100%!important;' +
+        'animation:pokelikeDexSkeleton 1.05s linear infinite!important;' +
+        'opacity:.32!important' +
+      '}' +
+      '.pokelike-media-loaded{transition:opacity .18s ease}' +
+      '.pokelike-loading-block{' +
+        'min-width:120px;min-height:52px;color:transparent!important;' +
+        'border:1px solid rgba(128,128,128,.2);' +
+        'background:linear-gradient(100deg,rgba(90,90,90,.16) 20%,' +
+        'rgba(180,180,180,.48) 45%,rgba(90,90,90,.16) 70%);' +
+        'background-size:220% 100%;animation:pokelikeDexSkeleton 1.05s linear infinite' +
+      '}' +
       '@keyframes pokelikeDexSkeleton{to{background-position:-220% 0}}';
     document.head.appendChild(style);
   }
@@ -2370,6 +2723,7 @@
     installNetworkMonitor();
     installNfcDebugAccess();
     installGenerationGuards();
+    installThemeSync();
     installRunBackup();
     installMapUiWatchdog();
     ensureLanguagePicker();
@@ -2385,6 +2739,7 @@
     renderPatchNotes();
     capPokedexAt649();
     preparePokedexSkeletons();
+    prepareAsyncMediaSkeletons(document);
     removeDebugSettingsAccess();
     ensureBackButton();
     updateLanguagePickerVisibility();
@@ -2395,6 +2750,20 @@
     window.__pokelikeApkObserver = new MutationObserver(function (mutations) {
       ensureBackButton();
       updateLanguagePickerVisibility();
+      var debugOnly = mutations.length > 0 && mutations.every(function (mutation) {
+        var target = mutation.target?.nodeType === 1
+          ? mutation.target
+          : mutation.target?.parentElement;
+        if (target?.closest?.('#pokelike-debug-modal,#pokelike-debug-detail')) {
+          return true;
+        }
+        return Array.prototype.every.call(mutation.addedNodes || [], function (node) {
+          return node.nodeType !== 1 || !!node.closest?.(
+            '#pokelike-debug-modal,#pokelike-debug-detail'
+          );
+        });
+      });
+      if (debugOnly) return;
       var dexOnly = mutations.length > 0 && mutations.every(function (mutation) {
         var target = mutation.target?.nodeType === 1
           ? mutation.target
@@ -2408,6 +2777,7 @@
       if (dexOnly) {
         capPokedexAt649();
         preparePokedexSkeletons();
+        prepareAsyncMediaSkeletons(document.getElementById('pokedex-modal'));
       } else if (mutations.some(function (mutation) {
         return mutation.type === 'childList' || mutation.type === 'characterData';
       })) {
@@ -2426,6 +2796,7 @@
       applyAll();
       if (typeof loadStaticPokedex === 'function') {
         var preload = function () {
+          preloadPokedexSprites();
           loadStaticPokedex()
             .catch(function () {})
             .finally(function () {
@@ -2445,9 +2816,9 @@
         window.__pokelikeRunBackupLoop = setInterval(function () {
           installRunBackup();
           if (localStorage.getItem('poke_current_run')) scheduleRunBackup(false);
-        }, 5000);
+        }, 1000);
         document.addEventListener('visibilitychange', function () {
-          if (document.visibilityState === 'hidden') scheduleRunBackup(true);
+          if (document.visibilityState === 'hidden') backupCurrentRunNow();
         });
       }
       if (!window.__pokelikeTelemetryGuard) {
