@@ -1,0 +1,9 @@
+name = "proud-mouse-eb9f"
+main = "src/index.js"
+compatibility_date = "2026-06-12"
+workers_dev = true
+preview_urls = false
+
+[vars]
+ALLOWED_ORIGIN = "https://www.pokemin.it"
+NFC_TOKEN_TTL_SECONDS = "31536000"

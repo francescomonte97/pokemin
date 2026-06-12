@@ -1,6 +1,7 @@
 package it.pokemin.app;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.app.DownloadManager;
@@ -27,6 +28,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.animation.LinearInterpolator;
+import android.window.OnBackInvokedDispatcher;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
@@ -115,6 +117,7 @@ public class MainActivity extends Activity {
         configureWebView();
         configureNativeControls();
         configureSafeAreaInsets();
+        configureSystemBackNavigation();
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         requestNotificationPermission();
 
@@ -479,9 +482,31 @@ public class MainActivity extends Activity {
                     "});" +
                     "window.__pokelikeNativeDexButtons=[];" +
                 "};" +
+                "window.__pokelikeNativeScreenToken=0;" +
                 "window.__pokelikeNativeReport=function(){" +
                     "var active=document.querySelector('.screen.active');" +
-                    "PokeLikeNativeUi.onScreenChanged(active?active.id:'');" +
+                    "var screenId=active?active.id:'';" +
+                    "var token=++window.__pokelikeNativeScreenToken;" +
+                    "if(screenId!=='map-screen'){" +
+                        "PokeLikeNativeUi.onScreenChanged(screenId);return;" +
+                    "}" +
+                    "PokeLikeNativeUi.onScreenChanged('map-loading');" +
+                    "var frames=0;" +
+                    "function reportMapReady(){" +
+                        "if(token!==window.__pokelikeNativeScreenToken)return;" +
+                        "var current=document.querySelector('.screen.active');" +
+                        "if(!current||current.id!=='map-screen')return;" +
+                        "frames++;" +
+                        "var map=document.getElementById('map-container');" +
+                        "var team=document.getElementById('team-bar');" +
+                        "var mapReady=!!(map&&map.querySelector('svg')&&" +
+                            "map.style.backgroundImage&&team&&team.children.length);" +
+                        "if(frames>=2&&mapReady){" +
+                            "PokeLikeNativeUi.onScreenChanged('map-screen');return;" +
+                        "}" +
+                        "if(frames<180)requestAnimationFrame(reportMapReady);" +
+                    "}" +
+                    "requestAnimationFrame(reportMapReady);" +
                 "};" +
                 "new MutationObserver(window.__pokelikeNativeReport).observe(document.body,{" +
                     "subtree:true,attributes:true,attributeFilter:['class']" +
@@ -737,13 +762,27 @@ public class MainActivity extends Activity {
         }
     }
 
-    @Override
-    public void onBackPressed() {
-        if (webView.canGoBack()) {
+    private void configureSystemBackNavigation() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                this::handleSystemBack
+            );
+        }
+    }
+
+    private void handleSystemBack() {
+        if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
-            super.onBackPressed();
+            finishAfterTransition();
         }
+    }
+
+    @SuppressLint("GestureBackNavigation")
+    @Override
+    public void onBackPressed() {
+        handleSystemBack();
     }
 
     @Override

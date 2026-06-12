@@ -1683,16 +1683,6 @@
         );
         var fastPokedex = eval('(' + pokedexSource + ')');
         openPokedexModal = function (initialTab) {
-          var warmed = document.querySelector(
-            '#pokedex-modal[data-pokelike-warmed="1"]'
-          );
-          if (warmed) {
-            warmed.removeAttribute('data-pokelike-warmed');
-            warmed.style.removeProperty('visibility');
-            warmed.style.removeProperty('pointer-events');
-            warmed.style.removeProperty('z-index');
-            return Promise.resolve();
-          }
           var incompleteWarmup = document.getElementById('pokedex-modal');
           if (incompleteWarmup) incompleteWarmup.remove();
           return new Promise(function (resolve) {
@@ -1848,34 +1838,10 @@
   }
 
   function warmPokedexModal() {
-    if (pokedexWarmupPending || document.getElementById('pokedex-modal')) return;
-    if (typeof isPlayerLoggedIn === 'function' && !isPlayerLoggedIn()) return;
-    if (
-      typeof openPokedexModal !== 'function' ||
-      typeof openPokedexModal.__pokelikeOriginal !== 'function'
-    ) {
-      return;
+    preloadPokedexSprites();
+    if (typeof loadStaticPokedex === 'function') {
+      loadStaticPokedex().catch(function () {});
     }
-
-    pokedexWarmupPending = true;
-    Promise.resolve(openPokedexModal.__pokelikeOriginal('normal'))
-      .then(function () {
-        var warmModal = document.getElementById('pokedex-modal');
-        if (!warmModal) return;
-        waitForPokedexCards(function (ready) {
-          var modal = document.getElementById('pokedex-modal');
-          if (!modal || modal !== warmModal || !ready) return;
-          preparePokedexSkeletons();
-          modal.dataset.pokelikeWarmed = '1';
-          modal.style.visibility = 'hidden';
-          modal.style.pointerEvents = 'none';
-          modal.style.zIndex = '-1';
-        }, 6000, warmModal);
-      })
-      .catch(function () {})
-      .finally(function () {
-        pokedexWarmupPending = false;
-      });
   }
 
   function preparePokedexSkeletons() {
@@ -2497,7 +2463,7 @@
       try {
         var verifier = null;
         for (var attempt = 0; attempt < 100; attempt++) {
-          verifier = window.pokeFirestoreDebugAccess?.verifyTag;
+          verifier = window.pokeCloudflareDebugAccess?.verifyTag;
           if (typeof verifier === 'function') break;
           await new Promise(function (resolve) { setTimeout(resolve, 100); });
         }
@@ -2561,6 +2527,30 @@
         'content:attr(data-pokelike-dex-loading);display:inline-block;' +
         'min-width:13px;margin-left:4px;color:#ffd84a;text-align:left' +
       '}' +
+      'body:has(#map-screen.active) #achievements-modal .ach-modal-close{' +
+        'transform:translateX(-50px)' +
+      '}' +
+      'body:has(#map-screen.active) #pokedex-modal{' +
+        'box-sizing:border-box;padding-right:58px' +
+      '}' +
+      'body:has(#map-screen.active) #pokedex-modal .dex-modal-box{' +
+        'width:100%;max-width:522px;margin-left:0;margin-right:auto' +
+      '}' +
+      'body:has(#map-screen.active) #pokedex-modal .dex-modal-header{' +
+        'box-sizing:border-box;padding-right:8px;gap:5px' +
+      '}' +
+      'body:has(#map-screen.active) #pokedex-modal .dex-tabs{' +
+        'min-width:0;flex-shrink:1' +
+      '}' +
+      'body:has(#map-screen.active) #pokedex-modal .dex-tab{' +
+        'padding-left:6px;padding-right:6px' +
+      '}' +
+      'body:has(#map-screen.active) #pokedex-modal .dex-counts{' +
+        'white-space:nowrap;font-size:8px' +
+      '}' +
+      'body:has(#map-screen.active) #pokedex-modal .ach-modal-close{' +
+        'position:relative;z-index:2;flex:0 0 auto' +
+      '}' +
       '.screen.active:not(#title-screen){' +
         'box-sizing:border-box;padding-top:max(16px,calc(12px + env(safe-area-inset-top)))' +
       '}' +
@@ -2596,6 +2586,18 @@
         '}' +
         '#map-screen.active #item-bar .item-sprite-icon{' +
           'width:20px!important;height:20px!important' +
+        '}' +
+        'body:has(#map-screen.active) #pokedex-modal{' +
+          'align-items:center;justify-content:flex-start;padding-left:8px;padding-right:58px' +
+        '}' +
+        'body:has(#map-screen.active) #pokedex-modal .dex-modal-box{' +
+          'max-width:calc(100vw - 66px);max-height:84vh' +
+        '}' +
+        'body:has(#map-screen.active) #pokedex-modal .dex-modal-header{' +
+          'padding-left:7px' +
+        '}' +
+        'body:has(#map-screen.active) #pokedex-modal .dex-tab{' +
+          'font-size:7px' +
         '}' +
         '#battle-screen.active{padding-top:calc(12px + env(safe-area-inset-top))}' +
         '.battle-header h2{font-size:10px!important}' +

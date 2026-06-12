@@ -2,29 +2,30 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
-  <title>Pokelike NFC Tag Writer</title>
+  <title>Pokelike NFC Debug Tag</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #101319;
-      --panel: #1a2029;
-      --panel-2: #242c38;
-      --border: #536175;
-      --text: #f4f6f9;
-      --muted: #aeb9c8;
-      --accent: #f2cf45;
-      --success: #69d58b;
-      --danger: #ff7e7e;
+      --bg: #0b1016;
+      --panel: #141c25;
+      --field: #090d12;
+      --line: #3a4d61;
+      --text: #f4f7fb;
+      --muted: #a9b6c5;
+      --yellow: #ffd84a;
+      --green: #69d58b;
+      --red: #ff7c7c;
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
       min-height: 100vh;
+      margin: 0;
+      padding: max(18px, env(safe-area-inset-top)) 16px
+        max(18px, env(safe-area-inset-bottom));
       display: grid;
       place-items: center;
-      padding: 18px;
       background: var(--bg);
       color: var(--text);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -32,242 +33,304 @@
     main {
       width: min(100%, 620px);
       padding: 22px;
-      border: 1px solid var(--border);
+      border: 1px solid var(--line);
       background: var(--panel);
-      box-shadow: 5px 5px 0 #050608;
+      box-shadow: 5px 5px 0 #000;
     }
-    h1 {
-      margin: 0 0 10px;
-      color: var(--accent);
-      font-size: clamp(20px, 6vw, 30px);
-    }
-    p {
-      margin: 0 0 18px;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-    label {
-      display: block;
-      margin: 15px 0 7px;
-      font-weight: 700;
-    }
-    textarea, input, button {
+    h1 { margin: 0 0 8px; color: var(--yellow); font-size: 25px; }
+    p { margin: 0 0 18px; color: var(--muted); line-height: 1.55; }
+    label { display: block; margin: 15px 0 7px; font-weight: 700; }
+    input, textarea, button {
       width: 100%;
-      border: 1px solid var(--border);
+      border: 1px solid var(--line);
       border-radius: 4px;
       font: inherit;
     }
-    textarea, input {
-      min-height: 88px;
-      resize: vertical;
+    input, textarea {
       padding: 11px;
-      background: #0d1117;
+      background: var(--field);
       color: var(--text);
+    }
+    input { min-height: 44px; }
+    textarea {
+      min-height: 118px;
+      resize: vertical;
       overflow-wrap: anywhere;
     }
-    input {
-      min-height: 43px;
-      resize: none;
+    button {
+      min-height: 44px;
+      padding: 10px 12px;
+      cursor: pointer;
+      background: #253344;
+      color: var(--text);
+      font-weight: 700;
     }
+    button.primary {
+      border-color: var(--yellow);
+      background: var(--yellow);
+      color: #181410;
+    }
+    button:disabled { cursor: not-allowed; opacity: .42; }
+    .key-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+    .key-row button { width: auto; min-width: 74px; }
     .actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 9px;
       margin-top: 12px;
     }
-    button {
-      min-height: 43px;
-      padding: 10px 12px;
-      cursor: pointer;
-      background: var(--panel-2);
-      color: var(--text);
-      font-weight: 700;
-    }
-    button.primary {
-      grid-column: 1 / -1;
-      border-color: var(--accent);
-      background: var(--accent);
-      color: #181410;
-    }
-    button:disabled { cursor: not-allowed; opacity: .45; }
+    .actions .wide { grid-column: 1 / -1; }
     output {
       display: block;
-      min-height: 48px;
+      min-height: 54px;
       margin-top: 16px;
       padding: 11px;
-      border: 1px solid var(--border);
-      background: #0d1117;
+      border: 1px solid var(--line);
+      background: var(--field);
       color: var(--muted);
       line-height: 1.5;
       overflow-wrap: anywhere;
       white-space: pre-wrap;
     }
-    output.ok { color: var(--success); border-color: var(--success); }
-    output.error { color: var(--danger); border-color: var(--danger); }
-    .note { margin-top: 14px; font-size: 12px; }
+    output.ok { color: var(--green); border-color: var(--green); }
+    output.error { color: var(--red); border-color: var(--red); }
+    .note { margin: 14px 0 0; font-size: 12px; }
     @media (max-width: 480px) {
-      main { padding: 18px; }
+      main { padding: 17px; }
       .actions { grid-template-columns: 1fr; }
-      button.primary { grid-column: auto; }
+      .actions .wide { grid-column: auto; }
     }
   </style>
 </head>
 <body>
   <main>
-    <h1>NFC Tag Writer</h1>
+    <h1>NFC Debug Tag</h1>
     <p>
-      Genera un valore segreto, scrivilo su un tag NFC e conserva in Firestore
-      soltanto il suo hash SHA-256.
+      Verifica la chiave amministrativa, genera un token firmato dal Worker
+      Reactiondex e scrivilo su un tag NFC.
     </p>
 
-    <label for="tag-value">Valore del tag</label>
-    <textarea id="tag-value" autocomplete="off" spellcheck="false"></textarea>
-
     <label for="admin-key">ADMIN_API_KEY</label>
-    <input id="admin-key" type="password" autocomplete="off"
-      placeholder="Chiave amministrativa del Worker">
-
-    <div class="actions">
-      <button id="generate" type="button">Genera valore</button>
-      <button id="copy-value" type="button">Copia valore</button>
-      <button id="write" class="primary" type="button">Scrivi tag NFC</button>
+    <div class="key-row">
+      <input id="admin-key" type="password" autocomplete="off"
+        placeholder="Incolla la chiave Cloudflare">
+      <button id="toggle-key" type="button">Mostra</button>
     </div>
 
-    <label for="tag-hash">Hash SHA-256 per Firestore</label>
-    <textarea id="tag-hash" readonly></textarea>
+    <div class="actions">
+      <button id="test-key" type="button">Test chiave</button>
+      <button id="generate" type="button">Genera token</button>
+    </div>
+
+    <label for="tag-value">Token NFC firmato</label>
+    <textarea id="tag-value" readonly spellcheck="false"
+      placeholder="Il token comparirà qui dopo la generazione"></textarea>
 
     <div class="actions">
-      <button id="copy-hash" type="button">Copia hash</button>
+      <button id="copy-value" type="button">Copia token</button>
+      <button id="verify" type="button">Verifica token</button>
+      <button id="write" class="primary wide" type="button" disabled>
+        Scrivi tag NFC
+      </button>
     </div>
 
     <output id="status" aria-live="polite">Pronto.</output>
     <p class="note">
-      Richiede Chrome su Android, NFC attivo e una pagina servita tramite HTTPS.
-      Dopo la scrittura, il solo hash viene sostituito automaticamente in Firestore.
-      La chiave amministrativa resta esclusivamente nella scheda corrente.
+      La pagina richiede HTTPS e Chrome su Android per scrivere il tag.
+      La chiave rimane solo nella sessione di questa scheda e non viene scritta
+      sul tag NFC.
     </p>
   </main>
 
   <script>
-    const valueInput = document.getElementById('tag-value');
-    const hashOutput = document.getElementById('tag-hash');
-    const status = document.getElementById('status');
-    const writeButton = document.getElementById('write');
-    const adminKeyInput = document.getElementById('admin-key');
-    const workerUrl =
-      'https://pokemin-save-recovery.montefortefrancesco50.workers.dev';
+    (() => {
+      'use strict';
 
-    adminKeyInput.value = sessionStorage.getItem('pokelike_nfc_admin_key') || '';
+      const WORKER_URL =
+        'https://proud-mouse-eb9f.reactiondex-rx.workers.dev';
+      const keyInput = document.getElementById('admin-key');
+      const tokenInput = document.getElementById('tag-value');
+      const status = document.getElementById('status');
+      const testButton = document.getElementById('test-key');
+      const generateButton = document.getElementById('generate');
+      const verifyButton = document.getElementById('verify');
+      const writeButton = document.getElementById('write');
 
-    function randomSecret() {
-      const bytes = crypto.getRandomValues(new Uint8Array(24));
-      const token = [...bytes]
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-      return `pokelike-debug:${token}`;
-    }
+      keyInput.value = sessionStorage.getItem('pokelike_nfc_admin_key') || '';
 
-    async function sha256Hex(value) {
-      const data = new TextEncoder().encode(value.trim());
-      const digest = await crypto.subtle.digest('SHA-256', data);
-      return [...new Uint8Array(digest)]
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-    }
-
-    async function refreshHash() {
-      const value = valueInput.value.trim();
-      hashOutput.value = value ? await sha256Hex(value) : '';
-    }
-
-    async function updateFirestoreTagHash(tagHash) {
-      const adminKey = adminKeyInput.value.trim();
-      if (!adminKey) throw new Error('Inserisci ADMIN_API_KEY.');
-      sessionStorage.setItem('pokelike_nfc_admin_key', adminKey);
-
-      const response = await fetch(`${workerUrl}/admin/debug-nfc`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${adminKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ tagHash })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || `Aggiornamento Firestore fallito (${response.status}).`);
-      }
-      return data;
-    }
-
-    async function copyText(value, label) {
-      if (!value) return;
-      await navigator.clipboard.writeText(value);
-      status.className = 'ok';
-      status.textContent = `${label} copiato.`;
-    }
-
-    document.getElementById('generate').addEventListener('click', async () => {
-      valueInput.value = randomSecret();
-      await refreshHash();
-      status.className = 'ok';
-      status.textContent = 'Nuovo valore generato localmente.';
-    });
-
-    valueInput.addEventListener('input', refreshHash);
-    document.getElementById('copy-value').addEventListener('click', () =>
-      copyText(valueInput.value.trim(), 'Valore')
-    );
-    document.getElementById('copy-hash').addEventListener('click', () =>
-      copyText(hashOutput.value, 'Hash')
-    );
-
-    writeButton.addEventListener('click', async () => {
-      const value = valueInput.value.trim();
-      if (!value) {
-        status.className = 'error';
-        status.textContent = 'Genera o inserisci prima un valore.';
-        return;
-      }
-      if (!adminKeyInput.value.trim()) {
-        status.className = 'error';
-        status.textContent = 'Inserisci ADMIN_API_KEY prima di scrivere il tag.';
-        adminKeyInput.focus();
-        return;
-      }
-      if (!('NDEFReader' in window)) {
-        status.className = 'error';
-        status.textContent = 'Web NFC non disponibile. Usa Chrome su Android tramite HTTPS.';
-        return;
+      function setStatus(message, type = '') {
+        status.className = type;
+        status.textContent = message;
       }
 
-      writeButton.disabled = true;
-      status.className = '';
-      status.textContent = 'Avvicina il tag NFC al telefono...';
-      try {
-        const writer = new NDEFReader();
-        await writer.write({
-          records: [{
-            recordType: 'text',
-            data: value,
-            lang: 'en'
-          }]
+      function normalizeKey() {
+        let value = keyInput.value.trim();
+        value = value.replace(/^Authorization:\s*Bearer\s+/i, '');
+        value = value.replace(/^Bearer\s+/i, '');
+        value = value.replace(/^['"]|['"]$/g, '').trim();
+        keyInput.value = value;
+        return value;
+      }
+
+      async function readResponse(response) {
+        const text = await response.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch {}
+        if (!response.ok) {
+          throw new Error(data.error || `Errore Worker (${response.status})`);
+        }
+        return data;
+      }
+
+      async function createToken() {
+        const key = normalizeKey();
+        if (!key) throw new Error('Inserisci ADMIN_API_KEY.');
+
+        const response = await fetch(`${WORKER_URL}/admin/debug-nfc/token`, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-store',
+          headers: {
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json'
+          },
+          body: '{}'
         });
-        await refreshHash();
-        status.textContent = 'Tag scritto. Aggiornamento Firestore...';
-        await updateFirestoreTagHash(hashOutput.value);
-        status.className = 'ok';
-        status.textContent = 'Tag scritto e autorizzazione Firestore aggiornata correttamente.';
-      } catch (error) {
-        status.className = 'error';
-        status.textContent = `Scrittura non riuscita: ${error.message || error}`;
-      } finally {
-        writeButton.disabled = false;
+        const data = await readResponse(response);
+        if (!data.tagValue) throw new Error('Il Worker non ha restituito il token.');
+        sessionStorage.setItem('pokelike_nfc_admin_key', key);
+        return data.tagValue;
       }
-    });
 
-    valueInput.value = randomSecret();
-    refreshHash();
+      async function verifyToken(token) {
+        const response = await fetch(`${WORKER_URL}/debug-nfc/verify`, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tagValue: token })
+        });
+        const data = await readResponse(response);
+        return data.valid === true;
+      }
+
+      async function generateAndVerify(showToken = true) {
+        const token = await createToken();
+        const valid = await verifyToken(token);
+        if (!valid) throw new Error('Il token è stato generato ma non risulta valido.');
+        if (showToken) tokenInput.value = token;
+        writeButton.disabled = false;
+        return token;
+      }
+
+      async function withBusy(buttons, task) {
+        buttons.forEach(button => { button.disabled = true; });
+        try {
+          return await task();
+        } finally {
+          buttons.forEach(button => {
+            button.disabled = button === writeButton && !tokenInput.value.trim();
+          });
+        }
+      }
+
+      document.getElementById('toggle-key').addEventListener('click', event => {
+        const visible = keyInput.type === 'text';
+        keyInput.type = visible ? 'password' : 'text';
+        event.currentTarget.textContent = visible ? 'Mostra' : 'Nascondi';
+      });
+
+      testButton.addEventListener('click', () => withBusy(
+        [testButton, generateButton, writeButton],
+        async () => {
+          setStatus('Verifica della chiave in corso...');
+          await generateAndVerify(false);
+          tokenInput.value = '';
+          writeButton.disabled = true;
+          setStatus('Chiave valida. Il Worker Reactiondex risponde correttamente.', 'ok');
+        }
+      ).catch(error => {
+        setStatus(
+          `${error.message}\nOrigine pagina: ${location.origin}\nWorker: ${WORKER_URL}`,
+          'error'
+        );
+      }));
+
+      generateButton.addEventListener('click', () => withBusy(
+        [testButton, generateButton, writeButton],
+        async () => {
+          setStatus('Generazione e verifica del token...');
+          await generateAndVerify(true);
+          setStatus('Token valido e pronto per la scrittura.', 'ok');
+        }
+      ).catch(error => {
+        tokenInput.value = '';
+        writeButton.disabled = true;
+        setStatus(error.message, 'error');
+      }));
+
+      verifyButton.addEventListener('click', async () => {
+        const token = tokenInput.value.trim();
+        if (!token) return setStatus('Genera prima un token.', 'error');
+        verifyButton.disabled = true;
+        try {
+          setStatus('Verifica del token...');
+          const valid = await verifyToken(token);
+          writeButton.disabled = !valid;
+          setStatus(
+            valid ? 'Token valido.' : 'Token non valido o scaduto.',
+            valid ? 'ok' : 'error'
+          );
+        } catch (error) {
+          writeButton.disabled = true;
+          setStatus(error.message, 'error');
+        } finally {
+          verifyButton.disabled = false;
+        }
+      });
+
+      document.getElementById('copy-value').addEventListener('click', async () => {
+        const token = tokenInput.value.trim();
+        if (!token) return setStatus('Nessun token da copiare.', 'error');
+        try {
+          await navigator.clipboard.writeText(token);
+          setStatus('Token copiato.', 'ok');
+        } catch {
+          tokenInput.select();
+          document.execCommand('copy');
+          setStatus('Token copiato.', 'ok');
+        }
+      });
+
+      writeButton.addEventListener('click', async () => {
+        const token = tokenInput.value.trim();
+        if (!token) return setStatus('Genera prima un token.', 'error');
+        if (!('NDEFReader' in window)) {
+          return setStatus(
+            'Web NFC non disponibile. Apri questa pagina HTTPS con Chrome su Android.',
+            'error'
+          );
+        }
+
+        writeButton.disabled = true;
+        try {
+          setStatus('Avvicina il tag NFC al telefono...');
+          const writer = new NDEFReader();
+          await writer.write({
+            records: [{ recordType: 'text', data: token, lang: 'en' }]
+          });
+          setStatus('Tag NFC scritto correttamente.', 'ok');
+        } catch (error) {
+          setStatus(`Scrittura non riuscita: ${error.message || error}`, 'error');
+        } finally {
+          writeButton.disabled = false;
+        }
+      });
+    })();
   </script>
 </body>
 </html>

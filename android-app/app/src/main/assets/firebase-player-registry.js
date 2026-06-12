@@ -19,8 +19,9 @@ const db = getFirestore(app);
 const PLAYER_STATS_COLLECTION = 'player_stats';
 const FALLBACK_ACCOUNTS_COLLECTION = 'player_accounts';
 const FALLBACK_SAVES_COLLECTION = 'player_saves';
-const APP_CONFIG_COLLECTION = 'app_config';
-const VISITOR_ID_ENDPOINT = 'https://pokemin-visitor-id.montefortefrancesco50.workers.dev/';
+const VISITOR_ID_ENDPOINT = 'https://proud-mouse-eb9f.reactiondex-rx.workers.dev/';
+const DEBUG_NFC_VERIFY_ENDPOINT =
+  'https://proud-mouse-eb9f.reactiondex-rx.workers.dev/debug-nfc/verify';
 const STATS_WRITE_INTERVAL_MS = 5 * 60 * 1000;
 const PLAYTIME_KEY = 'poke_playtime_ms';
 const LAST_STATS_WRITE_KEY = 'poke_firestore_stats_last_write';
@@ -269,31 +270,18 @@ async function clearRunBackup(uuid) {
   }, { merge: true });
 }
 
-async function sha256Hex(value) {
-  const bytes = new TextEncoder().encode(String(value || '').trim());
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)]
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 async function verifyDebugNfcTag(tagValue) {
   const value = String(tagValue || '').trim();
   if (!value) return false;
-  await ensureFirebaseAuth();
-  const snap = await getDoc(doc(db, APP_CONFIG_COLLECTION, 'debug_access'));
-  if (!snap.exists()) return false;
-  const config = snap.data() || {};
-  if (config.enabled !== true) return false;
-  const allowedHashes = Array.isArray(config.nfcTagHashes)
-    ? config.nfcTagHashes
-    : config.nfcTagHash
-    ? [config.nfcTagHash]
-    : [];
-  const candidateHash = await sha256Hex(value);
-  return allowedHashes.some(hash =>
-    String(hash || '').trim().toLowerCase() === candidateHash
-  );
+  const response = await fetch(DEBUG_NFC_VERIFY_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tagValue: value }),
+    cache: 'no-store',
+  });
+  if (!response.ok) return false;
+  const data = await response.json();
+  return data?.valid === true;
 }
 
 function getPlayerStatsDocId(uuid) {
@@ -420,7 +408,7 @@ if (typeof window !== 'undefined') {
     load: loadRunBackup,
     clear: clearRunBackup,
   };
-  window.pokeFirestoreDebugAccess = {
+  window.pokeCloudflareDebugAccess = {
     verifyTag: verifyDebugNfcTag,
   };
 
