@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visitor Hash Checker</title>
+  <title>Visitor ID Verifier</title>
   <style>
     body {
       margin: 0;
@@ -60,6 +60,18 @@
       font-weight: 800;
       cursor: pointer;
     }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .secondary {
+      width: auto;
+      border-color: #4b5563;
+      background: #374151;
+      color: #f9fafb;
+    }
     output {
       display: block;
       margin-top: 16px;
@@ -77,51 +89,29 @@
 </head>
 <body>
   <main>
-    <h1>Visitor Hash Checker</h1>
+    <h1>Visitor ID Verifier</h1>
     <p>
-      SHA-256 non si puo invertire. Questo tool verifica solo se un IP noto,
-      combinato con il tuo salt privato, produce lo stesso visitorId.
+      Un visitorId SHA-256 non contiene un IP decodificabile. Questo strumento
+      verifica se un IP conosciuto, combinato con il salt privato, corrisponde
+      al visitorId indicato. I dati restano nel browser.
     </p>
 
     <label for="ip">IP da verificare</label>
-    <input id="ip" placeholder="es. 203.0.113.42">
+    <input id="ip" autocomplete="off" spellcheck="false" placeholder="es. 203.0.113.42">
 
     <label for="salt">IP_HASH_SALT privato</label>
-    <input id="salt" type="password" placeholder="incolla qui il salt Cloudflare">
+    <input id="salt" type="password" autocomplete="off" spellcheck="false" placeholder="incolla qui il salt Cloudflare">
 
     <label for="hash">visitorId / hash Firestore</label>
-    <textarea id="hash" placeholder="incolla qui il visitorId"></textarea>
+    <textarea id="hash" autocomplete="off" spellcheck="false" placeholder="incolla qui il visitorId"></textarea>
 
-    <button id="check">Verifica</button>
+    <div class="actions">
+      <button id="check" type="button">Verifica corrispondenza</button>
+      <button id="clear" class="secondary" type="button">Pulisci</button>
+    </div>
     <output id="result">In attesa...</output>
   </main>
 
-  <script>
-    async function sha256Hex(text) {
-      const data = new TextEncoder().encode(text);
-      const buffer = await crypto.subtle.digest('SHA-256', data);
-      return [...new Uint8Array(buffer)]
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-    }
-
-    document.getElementById('check').addEventListener('click', async () => {
-      const ip = document.getElementById('ip').value.trim();
-      const salt = document.getElementById('salt').value;
-      const expected = document.getElementById('hash').value.trim().toLowerCase();
-      const result = document.getElementById('result');
-
-      if (!ip || !salt || !expected) {
-        result.className = 'bad';
-        result.textContent = 'Compila IP, salt e hash.';
-        return;
-      }
-
-      const actual = await sha256Hex(`${ip}:${salt}`);
-      const match = actual === expected;
-      result.className = match ? 'ok' : 'bad';
-      result.textContent = `${match ? 'MATCH' : 'NO MATCH'}\n\nCalcolato:\n${actual}`;
-    });
-  </script>
+  <script src="visitor-hash-checker.js"></script>
 </body>
 </html>
